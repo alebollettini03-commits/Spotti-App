@@ -1,610 +1,402 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  where,
-} from 'firebase/firestore';
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type User as FirebaseUser,
-} from 'firebase/auth';
-import {
-  CalendarDays,
-  Check,
-  CircleUserRound,
-  Clock3,
-  Compass,
-  GlassWater,
-  Globe,
-  LocateFixed,
-  MapPin,
-  Minus,
-  Navigation,
-  Plus,
-  Search,
+import React, { useState } from 'react';
+import { 
+  Search, 
+  MapPin, 
+  Calendar, 
+  Globe, 
+  Trash2, 
+  Compass, 
+  Ticket, 
+  CheckCircle2, 
+  GlassWater, 
+  Map as MapIcon, 
+  Utensils, 
+  Beer, 
   Sparkles,
-  Ticket,
-  Trash2,
-  Utensils,
-  X,
+  Plus,
+  Minus
 } from 'lucide-react';
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from 'react-leaflet';
-import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
-import { firestore, auth, googleProvider } from './lib/firebase';
-import L from 'leaflet';
 
-type Language = 'it' | 'en';
+// --- LOGO ANIMATO "S" DI SPOTTI ---
+const SpottiLogo = () => (
+  <div className="relative flex items-center justify-center w-10 h-10 bg-[#1e4d40] rounded-xl overflow-hidden shadow-md group cursor-pointer">
+    <style>{`
+      @keyframes logoPulse {
+        0%, 100% { transform: scale(1); opacity: 0.9; }
+        50% { transform: scale(1.08); opacity: 1; }
+      }
+      @keyframes dashRotate {
+        0% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 24; }
+      }
+      .animate-s-path {
+        stroke-dasharray: 6, 3;
+        animation: dashRotate 2s linear infinite;
+      }
+      .animate-logo-container {
+        animation: logoPulse 3s ease-in-out infinite;
+      }
+    `}</style>
+    <svg 
+      viewBox="0 0 100 100" 
+      className="w-7 h-7 animate-logo-container transition-transform duration-300 group-hover:scale-110"
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="50" cy="50" r="42" stroke="#22c55e" strokeWidth="4" strokeOpacity="0.2" />
+      <path 
+        d="M 68 32 C 68 22, 32 22, 32 40 C 32 60, 68 40, 68 62 C 68 78, 32 78, 32 68" 
+        stroke="#22c55e" 
+        strokeWidth="10" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M 68 32 C 68 22, 32 22, 32 40 C 32 60, 68 40, 68 62 C 68 78, 32 78, 32 68" 
+        stroke="#ffffff" 
+        strokeWidth="4" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        className="animate-s-path"
+      />
+      <circle cx="68" cy="32" r="3" fill="#ffffff" />
+      <circle cx="32" cy="68" r="3" fill="#22c55e" />
+    </svg>
+  </div>
+);
 
-type VenueType = 'bar' | 'restaurant' | 'club';
-type Venue = {
-  id: string;
-  name: string;
-  address: string;
-  hours: string;
-  lat: number;
-  lng: number;
-  type: VenueType;
-};
-type CityEvent = {
-  id: string;
-  title: string;
-  venueName: string;
-  date: string;
-  time: string;
-  type: string;
-  posterUrl?: string;
-};
-type Booking = {
-  id: string;
-  venueId: string;
-  venueName?: string;
-  date: string;
-  time: string;
-  guests: string;
-  status: 'confirmed' | 'requested';
-  firstName?: string;
-  lastName?: string;
-  arrivalTime?: string;
-  eventTitle?: string;
-};
-type User = { uid: string; name: string; email: string; photoURL?: string | null };
-
-const mapCenter: [number, number] = [42.6589, 13.7039];
+// --- TIPO DATI & DIZIONARIO MULTILINGUA ---
+type Language = 'IT' | 'EN';
 
 const translations = {
-  it: {
-    explore: 'Esplora',
-    events: 'Eventi',
-    bookings: 'Prenotazioni',
-    subTitle: 'Affluenza Locali',
-    signIn: 'Accedi',
-    myBookings: 'Le mie prenotazioni',
-    logout: 'Esci',
-    searchPlaceholder: 'Cerca un locale o indirizzo',
-    showingIn: 'In programma stasera a',
-    allSpots: 'Tutti i locali',
-    bars: 'Bar',
-    restaurants: 'Ristoranti',
-    clubs: 'Club',
-    noVenues: 'Nessun locale disponibile',
-    noVenuesSub: 'I locali Firestore appariranno qui in tempo reale.',
-    seeEvents: 'Vedi eventi',
-    takeMeThere: 'Portami qui',
-    plansWithPulse: 'La città prende vita.',
-    datedThings: 'Eventi e appuntamenti da non perdere in città.',
-    today: 'Oggi',
-    browseMap: 'Mappa',
-    noEvents: 'Nessun evento disponibile.',
-    noEventsSub: 'Gli eventi appariranno qui in tempo reale.',
-    quieterDate: 'Nessun evento.',
-    quieterDateSub: 'Non c\'è nulla in programma per questa data.',
-    details: 'Dettagli',
-    editorialTitle: 'Vivi la serata giusta.',
-    editorialCopy: 'Scegli il tavolo o la pista da ballo perfetta per la tua serata.',
-    localiConnected: 'locali connessi',
-    eventsAvailable: 'eventi disponibili',
-    bookThisEvent: 'Prenota questo evento',
-    notInVenues: 'Il locale non è presente nella collezione venues.',
-    plansInMotion: 'Le tue prenotazioni.',
-    plansInMotionCopy: 'Tutti i tuoi tavoli e appuntamenti confermati.',
-    noPlans: 'Nessuna prenotazione.',
-    noPlansSub: 'Trova subito un tavolo o una serata speciale.',
-    exploreTonight: 'Esplora stasera',
-    cancelBooking: 'Cancella prenotazione',
-    bookingConfirmed: 'Prenotazione confermata.',
-    guest: 'persona',
-    guests: 'persone',
-    reserveSpot: 'Prenota il tuo posto',
-    makePlan: 'Fai una prenotazione',
-    eventStart: 'Inizio evento',
-    chooseTime: 'Scegli orario',
-    firstName: 'Nome',
-    lastName: 'Cognome',
-    date: 'Data',
-    time: 'Orario',
-    arrivalTime: 'Orario di arrivo',
-    partySize: 'Numero di persone',
-    notTonight: 'Annulla',
-    confirmBooking: 'Conferma prenotazione',
-    invalidTime: 'Orario non valido. L\'evento inizia alle',
-    invalidTimeSub: 'e non sono accettate prenotazioni precedenti.',
+  IT: {
+    brandName: "Spotti",
+    navEsplora: "Esplora",
+    navEventi: "Eventi",
+    navPrenotazioni: "Prenotazioni",
+    searchPlaceholder: "Cerca un locale o indirizzo",
+    filterAll: "Tutti i locali",
+    filterBar: "Bar",
+    filterRest: "Ristoranti",
+    filterClub: "Club",
+    eventsTitle: "La città prende vita.",
+    eventsSubtitle: "Eventi e appuntamenti da non perdere in città.",
+    eventsBadge: "Eventi SPOTT-AT-I",
+    eventsBoxTitle: "Vivi la serata giusta.",
+    eventsBoxDesc: "Scegli il tavolo o la pista da ballo perfetta per la tua serata.",
+    bookingsTitle: "Le tue prenotazioni.",
+    bookingsSubtitle: "Tutti i tuoi tavoli e appuntamenti confermati.",
+    bookingsBadge: "SPOTTI-tuoi",
+    bookingsBoxTitle: "Ti aspettiamo!",
+    bookingsBoxDesc: "Il miglior evento della città, a portata di un click",
+    exploraStasera: "Esplora stasera",
+    localiConnessi: "LOCALI CONNESSI",
+    eventiDisponibili: "EVENTI DISPONIBILI",
+    confirmed: "CONFERMATO",
+    today: "Oggi",
+    mapView: "Mappa",
+    guests: "ospiti"
   },
-  en: {
-    explore: 'Explore',
-    events: 'Events',
-    bookings: 'Bookings',
-    subTitle: 'Venue Footfall',
-    signIn: 'Sign in',
-    myBookings: 'My bookings',
-    logout: 'Log out',
-    searchPlaceholder: 'Search a place or address',
-    showingIn: 'Showing tonight in',
-    allSpots: 'All spots',
-    bars: 'Bars',
-    restaurants: 'Restaurants',
-    clubs: 'Clubs',
-    noVenues: 'No venues available',
-    noVenuesSub: 'Firestore venues will appear here in real time.',
-    seeEvents: 'See events',
-    takeMeThere: 'Get directions',
-    plansWithPulse: 'Plans with a pulse.',
-    datedThings: 'Dated things worth leaving the house for.',
-    today: 'Today',
-    browseMap: 'Browse map',
-    noEvents: 'No events available.',
-    noEventsSub: 'Firestore events will appear here in real time.',
-    quieterDate: 'A quieter date.',
-    quieterDateSub: 'Nothing is listed for this day yet.',
-    details: 'Details',
-    editorialTitle: 'Do one thing properly tonight.',
-    editorialCopy: 'Pick a room, a table or a dance floor that feels right.',
-    localiConnected: 'connected venues',
-    eventsAvailable: 'available events',
-    bookThisEvent: 'Book this event',
-    notInVenues: 'Venue not found in database.',
-    plansInMotion: 'Plans in motion.',
-    plansInMotionCopy: 'Your confirmed tables and reservations.',
-    noPlans: 'No plans yet.',
-    noPlansSub: 'Your next good night is one short walk away.',
-    exploreTonight: 'Explore tonight',
-    cancelBooking: 'Cancel booking',
-    bookingConfirmed: 'Booking confirmed.',
-    guest: 'guest',
-    guests: 'guests',
-    reserveSpot: 'Reserve your spot',
-    makePlan: 'Make a plan',
-    eventStart: 'Event start',
-    chooseTime: 'Choose your time',
-    firstName: 'First Name',
-    lastName: 'Last Name',
-    date: 'Date',
-    time: 'Time',
-    arrivalTime: 'Arrival Time',
-    partySize: 'Party size',
-    notTonight: 'Cancel',
-    confirmBooking: 'Confirm booking',
-    invalidTime: 'Invalid time. The event starts at',
-    invalidTimeSub: 'and earlier bookings are not allowed.',
+  EN: {
+    brandName: "Spotti",
+    navEsplora: "Explore",
+    navEventi: "Events",
+    navPrenotazioni: "Bookings",
+    searchPlaceholder: "Search venue or address",
+    filterAll: "All venues",
+    filterBar: "Bars",
+    filterRest: "Restaurants",
+    filterClub: "Clubs",
+    eventsTitle: "The city comes alive.",
+    eventsSubtitle: "Events and appointments not to be missed in town.",
+    eventsBadge: "SPOTTED Events",
+    eventsBoxTitle: "Live the right night.",
+    eventsBoxDesc: "Choose the perfect table or dance floor for your evening.",
+    bookingsTitle: "Your bookings.",
+    bookingsSubtitle: "All your confirmed tables and appointments.",
+    bookingsBadge: "YOUR-Spotti",
+    bookingsBoxTitle: "We are waiting for you!",
+    bookingsBoxDesc: "The best event in town, just a click away",
+    exploraStasera: "Explore tonight",
+    localiConnessi: "CONNECTED VENUES",
+    eventiDisponibili: "AVAILABLE EVENTS",
+    confirmed: "CONFIRMED",
+    today: "Today",
+    mapView: "Map",
+    guests: "guests"
   }
 };
 
-function isVenueType(value: unknown): value is VenueType {
-  return value === 'bar' || value === 'restaurant' || value === 'club';
-}
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'esplora' | 'eventi' | 'prenotazioni'>('esplora');
+  const [lang, setLang] = useState<Language>('IT');
+  const [filter, setFilter] = useState('all');
 
-function toDateString(value: unknown): string {
-  if (typeof value === 'string') return value.slice(0, 10);
-  if (value && typeof value === 'object') {
-    const timestamp = value as { toDate?: () => Date };
-    if (typeof timestamp.toDate === 'function') {
-      return timestamp.toDate().toISOString().slice(0, 10);
-    }
-  }
-  return '';
-}
+  const t = translations[lang];
 
-function readVenue(snapshot: { id: string; data: () => Record<string, unknown> }): Venue | null {
-  const data = snapshot.data();
-  const name = typeof data.name === 'string' ? data.name : '';
-  const address = typeof data.address === 'string' ? data.address : '';
-  const hours = typeof data.hours === 'string' ? data.hours : '';
-  const type = data.type;
-  const lat = Number(data.lat);
-  const lng = Number(data.lng);
-  if (!name || !address || !hours || !isVenueType(type) || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { id: snapshot.id, name, address, hours, lat, lng, type };
-}
-
-function readEvent(snapshot: { id: string; data: () => Record<string, unknown> }): CityEvent | null {
-  const data = snapshot.data();
-  const title = typeof data.title === 'string' ? data.title : '';
-  const venueName = typeof data.venueName === 'string' ? data.venueName : '';
-  const date = toDateString(data.date);
-  const time = typeof data.time === 'string' ? data.time : '';
-  const type = typeof data.type === 'string' ? data.type : '';
-  const posterUrl = typeof data.posterUrl === 'string' ? data.posterUrl : undefined;
-  if (!title || !venueName || !date || !time || !type) return null;
-  return { id: snapshot.id, title, venueName, date, time, type, posterUrl };
-}
-
-function venueColor(type: VenueType) {
-  return type === 'restaurant' ? '#2b7468' : type === 'club' ? '#665e9b' : '#dc7b55';
-}
-
-function venueIcon(venue: Venue, selected: boolean) {
-  return L.divIcon({
-    className: 'citylive-marker',
-    html: `<span class="leaflet-pin ${venue.type} ${selected ? 'selected' : ''}" style="--pin-color:${venueColor(venue.type)}"><span></span></span>`,
-    iconSize: [34, 44],
-    iconAnchor: [17, 42],
-    popupAnchor: [0, -38],
-  });
-}
-
-function formatEventDate(date: string, lang: Language) {
-  const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return { day: date, month: '', weekday: '' };
-  const locale = lang === 'it' ? 'it-IT' : 'en-US';
-  return {
-    day: new Intl.DateTimeFormat(locale, { day: '2-digit' }).format(parsed),
-    month: new Intl.DateTimeFormat(locale, { month: 'short' }).format(parsed).toUpperCase(),
-    weekday: new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(parsed).toUpperCase(),
-  };
-}
-
-function MapClickHandler({ onClick }: { onClick: () => void }) {
-  useMapEvents({
-    click: () => {
-      onClick();
-    },
-  });
-  return null;
-}
-
-function LanguageSelector({ onSelect }: { onSelect: (lang: Language) => void }) {
   return (
-    <div className="modal-backdrop" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', zIndex: 9999 }}>
-      <div className="modal" style={{ maxWidth: '420px', textAlign: 'center', padding: '36px 24px' }}>
-        <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', backgroundColor: 'rgba(43, 116, 104, 0.1)', color: '#2b7468', marginBottom: '16px' }}>
-          <Globe size={32} />
+    <div className="min-h-screen bg-[#f7f5f0] text-gray-800 font-sans flex flex-col">
+      
+      {/* NAVBAR SUPERIORE */}
+      <header className="bg-[#f7f5f0] border-b border-gray-200/60 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <SpottiLogo />
+          <span className="text-2xl font-bold tracking-tight text-gray-900 font-serif">
+            {t.brandName}
+          </span>
         </div>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Seleziona la lingua</h2>
-        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '28px' }}>Select your preferred language to enter CityLive</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <button
-            className="primary-button"
-            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '16px' }}
-            onClick={() => onSelect('it')}
+
+        {/* TAB NAVIGAZIONE */}
+        <nav className="flex items-center gap-2 bg-gray-200/50 p-1 rounded-2xl">
+          <button 
+            onClick={() => setActiveTab('esplora')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'esplora' ? 'bg-[#1e4d40] text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            🇮🇹 &nbsp; Italiano
+            <Compass className="w-4 h-4" />
+            {t.navEsplora}
           </button>
-          <button
-            className="outline-button"
-            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '16px' }}
-            onClick={() => onSelect('en')}
+
+          <button 
+            onClick={() => setActiveTab('eventi')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all relative ${
+              activeTab === 'eventi' ? 'bg-[#1e4d40] text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            🇬🇧 &nbsp; English
+            <Calendar className="w-4 h-4" />
+            {t.navEventi}
+            <span className="bg-orange-600 text-white text-xs px-1.5 py-0.2 rounded-full font-bold ml-1">
+              1
+            </span>
           </button>
+
+          <button 
+            onClick={() => setActiveTab('prenotazioni')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'prenotazioni' ? 'bg-[#1e4d40] text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Ticket className="w-4 h-4" />
+            {t.navPrenotazioni}
+          </button>
+        </nav>
+
+        {/* SELETTORE LINGUA E PROFILO */}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setLang(lang === 'IT' ? 'EN' : 'IT')}
+            className="p-2.5 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors flex items-center justify-center"
+            title="Cambia Lingua"
+          >
+            <Globe className="w-4 h-4 text-gray-700" />
+            <span className="ml-1 text-xs font-semibold">{lang}</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-gray-900 text-white pl-1.5 pr-4 py-1.5 rounded-full shadow-sm">
+            <div className="w-7 h-7 rounded-full bg-orange-600 flex items-center justify-center font-bold text-xs">
+              A
+            </div>
+            <span className="text-sm font-medium">Alessandro Bollettini</span>
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* CONTENUTO PRINCIPALE */}
+      <main className="flex-1 relative overflow-hidden">
+        
+        {/* VISTA: ESPLORA (MAPPA) */}
+        {activeTab === 'esplora' && (
+          <div className="relative w-full h-[calc(100vh-65px)] bg-[#e5e3df]">
+            {/* Sfondo Mappa Simulato */}
+            <div className="absolute inset-0 bg-cover bg-center opacity-80" 
+                 style={{ backgroundImage: `url('https://maps.googleapis.com/maps/api/staticmap?center=Teramo,Italy&zoom=14&size=1200x800&sensor=false')` }}>
+            </div>
+
+            {/* BARRA DI RICERCA */}
+            <div className="absolute top-6 left-6 z-10 w-96 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-2 border border-white/50 flex items-center gap-2">
+              <Search className="w-5 h-5 text-gray-400 ml-2" />
+              <input 
+                type="text" 
+                placeholder={t.searchPlaceholder}
+                className="w-full bg-transparent border-none outline-none text-sm text-gray-800 placeholder-gray-400"
+              />
+            </div>
+
+            {/* BADGE TERAMO IN ALTO A DESTRA */}
+            <div className="absolute top-6 right-6 z-10 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-md border border-white/50 flex items-center gap-2 text-xs font-medium text-gray-700">
+              <MapPin className="w-4 h-4 text-emerald-600" />
+              <span>Teramo</span>
+            </div>
+
+            {/* FILTRI DI CATEGORIA */}
+            <div className="absolute top-22 left-6 z-10 flex flex-col gap-2">
+              <button 
+                onClick={() => setFilter('all')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all ${
+                  filter === 'all' ? 'bg-[#1e4d40] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                {t.filterAll}
+              </button>
+              <button 
+                onClick={() => setFilter('bar')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all ${
+                  filter === 'bar' ? 'bg-[#1e4d40] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Beer className="w-4 h-4" />
+                {t.filterBar}
+              </button>
+              <button 
+                onClick={() => setFilter('rest')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all ${
+                  filter === 'rest' ? 'bg-[#1e4d40] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Utensils className="w-4 h-4" />
+                {t.filterRest}
+              </button>
+              <button 
+                onClick={() => setFilter('club')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all ${
+                  filter === 'club' ? 'bg-[#1e4d40] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <GlassWater className="w-4 h-4" />
+                {t.filterClub}
+              </button>
+            </div>
+
+            {/* CONTROLLI ZOOM MAPPA */}
+            <div className="absolute bottom-6 right-6 z-10 flex flex-col bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+              <button className="p-2.5 hover:bg-gray-50 border-b border-gray-100 text-gray-600"><Plus className="w-4 h-4" /></button>
+              <button className="p-2.5 hover:bg-gray-50 text-gray-600"><Minus className="w-4 h-4" /></button>
+            </div>
+          </div>
+        )}
+
+        {/* VISTA: EVENTI */}
+        {activeTab === 'eventi' && (
+          <div className="max-w-7xl mx-auto px-8 py-10">
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">{t.eventsTitle}</h1>
+                <p className="text-gray-500 text-sm">{t.eventsSubtitle}</p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-gray-200/60 p-1 rounded-xl text-xs font-medium">
+                <button className="px-3 py-1.5 bg-white rounded-lg shadow-sm text-gray-800">{t.today}</button>
+                <button className="px-3 py-1.5 text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                  <MapIcon className="w-3.5 h-3.5" />
+                  {t.mapView}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* LISTA EVENTI */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-6">
+                  <div className="bg-[#1e4d40] text-white p-4 rounded-xl text-center min-w-[70px]">
+                    <span className="block text-xl font-bold">18</span>
+                    <span className="text-[10px] uppercase tracking-wider font-semibold">DOM · OTT</span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full mb-1">BAR</span>
+                    <h3 className="font-bold text-gray-900 text-base">All you can drink</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Caffè dell'Arco · 20:30 · Circonvallazione Spalato, n° 71, 64100 Teramo TE</p>
+                  </div>
+                  <button className="bg-[#1e4d40] text-white px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-[#16382f] transition-colors">
+                    Dettagli
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD NERA EVENTI */}
+              <div className="bg-[#1a1c23] text-white rounded-3xl p-7 flex flex-col justify-between relative overflow-hidden min-h-[280px]">
+                <div>
+                  <span className="text-orange-500 font-bold text-xs tracking-wider uppercase">
+                    {t.eventsBadge}
+                  </span>
+                  <h2 className="text-2xl font-serif font-bold mt-3 mb-2">{t.eventsBoxTitle}</h2>
+                  <p className="text-xs text-gray-400 leading-relaxed max-w-xs">{t.eventsBoxDesc}</p>
+                </div>
+
+                <div className="flex gap-8 mt-6 pt-6 border-t border-gray-800">
+                  <div>
+                    <span className="text-xl font-bold">2</span>
+                    <span className="block text-[10px] text-gray-500 uppercase tracking-wider font-medium mt-0.5">{t.localiConnessi}</span>
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold">1</span>
+                    <span className="block text-[10px] text-gray-500 uppercase tracking-wider font-medium mt-0.5">{t.eventiDisponibili}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VISTA: PRENOTAZIONI */}
+        {activeTab === 'prenotazioni' && (
+          <div className="max-w-7xl mx-auto px-8 py-10">
+            <div className="mb-8">
+              <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">{t.bookingsTitle}</h1>
+              <p className="text-gray-500 text-sm">{t.bookingsSubtitle}</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* CARD PRENOTAZIONE CONFERMATA */}
+              <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-gray-200/70 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-5">
+                  <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center">
+                    <GlassWater className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-emerald-700 tracking-wider">BAR</span>
+                    <h3 className="text-lg font-bold text-gray-900">Caffè dell'Arco</h3>
+                    <p className="text-xs text-gray-500 mt-1">2026-10-18 · 20:30</p>
+                    <p className="text-xs text-gray-400">2 {t.guests} · Circonvallazione Spalato, n° 71, 64100 Teramo TE</p>
+                    <p className="text-xs font-semibold text-gray-700 mt-0.5">All you can drink</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {t.confirmed}
+                  </span>
+                  <button className="p-2.5 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD NERA PRENOTAZIONI AGGIORNATA */}
+              <div className="bg-[#1a1c23] text-white rounded-3xl p-7 flex flex-col justify-between relative overflow-hidden min-h-[280px]">
+                <div>
+                  <span className="text-orange-500 font-bold text-xs tracking-wider uppercase">
+                    {t.bookingsBadge}
+                  </span>
+                  <h2 className="text-2xl font-serif font-bold mt-3 mb-2">{t.bookingsBoxTitle}</h2>
+                  <p className="text-xs text-gray-400 leading-relaxed max-w-xs">{t.bookingsBoxDesc}</p>
+                </div>
+
+                <button 
+                  onClick={() => setActiveTab('esplora')}
+                  className="bg-[#22c55e] hover:bg-[#1eb053] text-gray-950 font-bold px-5 py-3 rounded-xl text-xs flex items-center gap-2 self-start transition-colors mt-6 shadow-md"
+                >
+                  <Compass className="w-4 h-4" />
+                  {t.exploraStasera}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
-
-function ZoomControls() {
-  const map = useMap();
-  return (
-    <div className="map-zoom">
-      <button className="icon-button" onClick={() => map.zoomIn()} aria-label="Zoom in"><Plus size={16} /></button>
-      <button className="icon-button" onClick={() => map.zoomOut()} aria-label="Zoom out"><Minus size={16} /></button>
-    </div>
-  );
-}
-
-function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onChangeLang }: { children: React.ReactNode; user: User | null; eventsCount: number; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void }) {
-  const [location] = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const t = translations[lang];
-
-  const nav = [
-    { href: '/', label: t.explore, icon: Compass },
-    { href: '/events', label: t.events, icon: CalendarDays },
-    { href: '/bookings', label: t.bookings, icon: Ticket },
-  ];
-
-  return <div className="app-shell">
-    <header className="app-nav">
-      <Link href="/" className="brand"><span className="brand-mark"><Navigation size={17} /></span><span className="brand-name">CityLive</span><span className="brand-sub">{t.subTitle}</span></Link>
-      <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`}><Icon size={14} /> {label}{href === '/events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button className="icon-button" onClick={onChangeLang} title="Cambia lingua / Change language">
-          <Globe size={16} />
-        </button>
-        {user ? <div className="user-menu-wrap"><button className="user-button" onClick={() => setMenuOpen((open) => !open)}><span className="avatar">{user.name.charAt(0)}</span><span>{user.name}</span></button>{menuOpen && <div className="user-menu" role="menu"><div className="user-menu-caption">{user.email}</div><Link href="/bookings" onClick={() => setMenuOpen(false)} role="menuitem"><Ticket size={14} /> {t.myBookings}</Link><button onClick={onSignOut} role="menuitem"><X size={14} /> {t.logout}</button></div>}</div> : <button className="outline-button" onClick={onSignIn}><CircleUserRound size={15} /> {t.signIn}</button>}
-      </div>
-    </header>
-    {children}
-    <nav className="mobile-nav" aria-label="Mobile navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''}><Icon size={16} /><span>{label}</span></Link>)}</nav>
-  </div>;
-}
-
-function Modal({ children, onClose, label }: { children: React.ReactNode; onClose: () => void; label: string }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="modal" role="dialog" aria-modal="true" aria-label={label}>{children}</div>
-  </div>;
-}
-
-function SignInModal({ onClose, onSignIn }: { onClose: () => void; onSignIn: () => void }) {
-  return <Modal onClose={onClose} label="Sign in to CityLive"><div className="modal-head"><div><span className="eyebrow">Your night, saved</span><h2>Keep the good plans.</h2><p>Sign in to book tables and keep every reservation in one place.</p></div><button className="icon-button" onClick={onClose} aria-label="Close sign in"><X size={17} /></button></div><div className="modal-body"><div className="signin-box"><Sparkles size={22} /><h3>Continue with Google</h3><p>We use your Google account to make bookings personal. No password to remember, no inbox noise.</p><button className="primary-button" onClick={onSignIn}>Continue with Google</button></div></div></Modal>;
-}
-
-function BookingModal({ venue, event, lang, onClose, onBooked }: { venue: Venue; event?: CityEvent; lang: Language; onClose: () => void; onBooked: (booking: Booking) => void }) {
-  const t = translations[lang];
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [date, setDate] = useState(event?.date ?? '');
-  const [time, setTime] = useState(event?.time ? (event.time.match(/\d{2}:\d{2}/)?.[0] ?? event.time) : '');
-  const [guests, setGuests] = useState(`2 ${t.guests}`);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const eventStartTime = event?.time?.match(/\d{2}:\d{2}/)?.[0] ?? event?.time;
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (eventStartTime && time) {
-      if (time < eventStartTime) {
-        setErrorMessage(`${t.invalidTime} ${eventStartTime} ${t.invalidTimeSub}`);
-        return;
-      }
-    }
-
-    onBooked({
-      id: `booking-${Date.now()}`,
-      venueId: venue.id,
-      venueName: venue.name,
-      date: date || new Date().toISOString().slice(0, 10),
-      time: time || '19:30',
-      guests: guests || `2 ${t.guests}`,
-      status: 'confirmed',
-      firstName: firstName || '',
-      lastName: lastName || '',
-      arrivalTime: venue.type === 'restaurant' ? (time || '') : '',
-      eventTitle: event?.title || ''
-    });
-  };
-
-  return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? t.reserveSpot : t.makePlan}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? `${t.eventStart}: ${event.time}` : t.chooseTime}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" />{errorMessage && <div style={{ color: '#d32f2f', backgroundColor: '#fde8e8', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', fontWeight: 500 }}>{errorMessage}</div>}<div className="form-grid"><div className="field"><label htmlFor="booking-first-name">{t.firstName}</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div><div className="field"><label htmlFor="booking-last-name">{t.lastName}</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div><div className="field"><label htmlFor="booking-date">{t.date}</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? t.arrivalTime : t.time}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div><div className="field full"><label htmlFor="booking-guests">{t.partySize}</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}><option>1 {t.guest}</option><option>2 {t.guests}</option><option>3 {t.guests}</option><option>4 {t.guests}</option><option>5 {t.guests}</option><option>6 {t.guests}</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose}>{t.notTonight}</button><button type="submit" className="primary-button"><Check size={15} /> {t.confirmBooking}</button></div></form></Modal>;
-}
-
-function Explore({ venues, lang }: { venues: Venue[]; lang: Language }) {
-  const [, setLocation] = useLocation();
-  const t = translations[lang];
-  const [activeFilters, setActiveFilters] = useState<VenueType[]>([]);
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Venue | null>(null);
-
-  const filtered = useMemo(() => venues.filter((venue) => (!activeFilters.length || activeFilters.includes(venue.type)) && `${venue.name} ${venue.address}`.toLowerCase().includes(search.toLowerCase())), [activeFilters, search, venues]);
-  const filters = [{ key: 'all' as const, label: t.allSpots, icon: Sparkles }, { key: 'bar' as const, label: t.bars, icon: GlassWater }, { key: 'restaurant' as const, label: t.restaurants, icon: Utensils }, { key: 'club' as const, label: t.clubs, icon: Ticket }];
-
-  return <main className="map-page">
-    <MapContainer center={mapCenter} zoom={14} minZoom={11} maxZoom={18} zoomControl={false} className="map-canvas" scrollWheelZoom>
-      <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      
-      <MapClickHandler onClick={() => setSelected(null)} />
-
-      {filtered.map((venue) => <Marker key={venue.id} position={[venue.lat, venue.lng]} icon={venueIcon(venue, selected?.id === venue.id)} eventHandlers={{ click: () => setSelected(venue) }}>
-        <Popup>
-          <div className="leaflet-popup-content-inner"><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> {t.takeMeThere}</a></div>
-        </Popup>
-      </Marker>)}
-      <ZoomControls />
-      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label="Search venues" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label><div className="map-note"><LocateFixed size={15} /><span>{t.showingIn} <strong>Teramo</strong></span></div></div>
-      <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])}><Icon size={13} /><span>{label}</span></button>; })}</div>
-      {!venues.length && <div className="map-empty"><strong>{t.noVenues}</strong><span>{t.noVenuesSub}</span></div>}
-    </MapContainer>
-    
-    {selected && <section className="map-panel"><div className="panel-image"><div className="panel-image-text">{selected.type}</div></div><div className="panel-body"><div className="eyebrow">{selected.type}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><MapPin size={12} /> {selected.address}</span><span className="meta-item"><Clock3 size={12} /> {selected.hours}</span></div><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)}><CalendarDays size={14} /> {t.seeEvents}</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={14} /> {t.takeMeThere}</a></div></div></section>}
-  </main>;
-}
-
-function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; venues: Venue[]; lang: Language; onBook: (venue: Venue, event?: CityEvent) => void }) {
-  const t = translations[lang];
-  const [selectedDate, setSelectedDate] = useState('');
-  const [eventDetail, setEventDetail] = useState<CityEvent | null>(null);
-  const dates = useMemo(() => [...new Set(events.map((event) => event.date))].sort(), [events]);
-
-  useEffect(() => {
-    if (!dates.length) setSelectedDate('');
-    else if (!dates.includes(selectedDate)) setSelectedDate(dates[0]);
-  }, [dates, selectedDate]);
-
-  const shown = events.filter((event) => event.date === selectedDate);
-  const eventVenue = (event: CityEvent) => venues.find((venue) => venue.name.trim().toLowerCase() === event.venueName.trim().toLowerCase());
-  const today = new Date().toISOString().slice(0, 10);
-
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">CityLive</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive editorial</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><div className="feature-stat"><div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div><div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
-}
-
-function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; lang: Language; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
-  const t = translations[lang];
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">CityLive</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>{t.noPlans}</h2><p>{t.noPlansSub}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></div></div>}</main>;
-}
-
-function RouterContent({ user, venues, events, lang, onSignIn, onSignOut, onChangeLang, bookings, onBooking, onDeleteBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void; onDeleteBooking: (bookingId: string) => void }) {
-  const [, setLocation] = useLocation();
-  return <AppShell user={user} eventsCount={events.length} lang={lang} onSignIn={onSignIn} onSignOut={onSignOut} onChangeLang={onChangeLang}><Switch><Route path="/"><Explore venues={venues} lang={lang} /></Route><Route path="/events"><EventsPage events={events} venues={venues} lang={lang} onBook={onBooking} /></Route><Route path="/bookings"><BookingsPage bookings={bookings} venues={venues} lang={lang} onExplore={() => setLocation('/')} onDeleteBooking={onDeleteBooking} /></Route><Route><div className="page"><div className="empty-state"><div><div className="empty-icon"><Compass size={24} /></div><h2>Page not found.</h2><Link href="/" className="primary-button">Back to explore</Link></div></div></div></Route></Switch></AppShell>;
-}
-
-function authUser(user: FirebaseUser): User {
-  return { uid: user.uid, name: user.displayName ?? user.email?.split('@')[0] ?? 'CityLive user', email: user.email ?? '', photoURL: user.photoURL };
-}
-
-function App() {
-  const [lang, setLang] = useState<Language | null>(() => {
-    return (localStorage.getItem('citylive_lang') as Language) || null;
-  });
-  const [user, setUser] = useState<User | null>(null);
-  const [venues, setVenues] = useState<Venue[]>([]);
-  const [events, setEvents] = useState<CityEvent[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [catalogErrors, setCatalogErrors] = useState({ venues: '', events: '' });
-  const [authOpen, setAuthOpen] = useState(false);
-  const [bookingTarget, setBookingTarget] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
-  const [pendingBooking, setPendingBooking] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
-  const [toast, setToast] = useState('');
-  const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3200); };
-
-  const handleSelectLanguage = (selectedLang: Language) => {
-    setLang(selectedLang);
-    localStorage.setItem('citylive_lang', selectedLang);
-  };
-
-  useEffect(() => onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser ? authUser(firebaseUser) : null)), []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(firestore, 'venues'), (snapshot) => {
-      setVenues(snapshot.docs.map(readVenue).filter((venue): venue is Venue => venue !== null));
-      setCatalogErrors((current) => ({ ...current, venues: '' }));
-    }, () => setCatalogErrors((current) => ({ ...current, venues: 'Impossibile leggere la collezione venues.' })));
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(firestore, 'events'), async (snapshot) => {
-      const today = new Date().toISOString().slice(0, 10);
-      const activeEvents: CityEvent[] = [];
-
-      for (const item of snapshot.docs) {
-        const parsed = readEvent(item);
-        if (parsed) {
-          if (parsed.date < today) {
-            try {
-              await deleteDoc(doc(firestore, 'events', item.id));
-            } catch (err) {
-              console.error('Errore durante l\'eliminazione dell\'evento scaduto:', err);
-            }
-          } else {
-            activeEvents.push(parsed);
-          }
-        }
-      }
-
-      setEvents(activeEvents);
-      setCatalogErrors((current) => ({ ...current, events: '' }));
-    }, () => setCatalogErrors((current) => ({ ...current, events: 'Impossibile leggere la collezione events.' })));
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    if (!user) { setBookings([]); return; }
-    let cancelled = false;
-    const loadBookings = async () => {
-      try {
-        const snapshot = await getDocs(query(collection(firestore, 'bookings'), where('userId', '==', user.uid)));
-        const today = new Date().toISOString().slice(0, 10);
-        const active: Booking[] = [];
-        await Promise.all(snapshot.docs.map(async (item) => {
-          const data = item.data() as Omit<Booking, 'id'>;
-          if (data.date && data.date < today) await deleteDoc(doc(firestore, 'bookings', item.id));
-          else active.push({ id: item.id, ...data });
-        }));
-        if (!cancelled) setBookings(active.sort((a, b) => a.date.localeCompare(b.date)));
-      } catch {
-        if (!cancelled) showToast('Non riesco a caricare le prenotazioni. Controlla le regole Firestore.');
-      }
-    };
-    void loadBookings();
-    return () => { cancelled = true; };
-  }, [user]);
-
-  const startGoogleSignIn = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const signedInUser = authUser(result.user);
-      setUser(signedInUser);
-      setAuthOpen(false);
-      if (pendingBooking) { setBookingTarget(pendingBooking); setPendingBooking(null); }
-      showToast('Sei entrato. Ora puoi confermare il tuo piano.');
-    } catch {
-      showToast('Accesso Google non riuscito. Verifica il dominio autorizzato in Firebase.');
-    }
-  };
-
-  const requestBooking = (venue: Venue, event?: CityEvent) => {
-    if (!user) { setPendingBooking({ venue, event }); setAuthOpen(true); return; }
-    setBookingTarget({ venue, event });
-  };
-
-  const booked = async (booking: Booking) => {
-    if (!user) return;
-    try {
-      const cleanData = {
-        userId: user.uid,
-        venueId: booking.venueId || '',
-        venueName: booking.venueName || '',
-        date: booking.date || '',
-        time: booking.time || '',
-        guests: booking.guests || '',
-        status: 'confirmed',
-        firstName: booking.firstName || '',
-        lastName: booking.lastName || '',
-        arrivalTime: booking.arrivalTime || '',
-        eventTitle: booking.eventTitle || '',
-        createdAt: serverTimestamp()
-      };
-      
-      const created = await addDoc(collection(firestore, 'bookings'), cleanData);
-      setBookings((current) => [{ ...booking, id: created.id }, ...current]);
-      setBookingTarget(null);
-      showToast(translations[lang || 'it'].bookingConfirmed);
-    } catch (err) {
-      console.error('Errore Firestore:', err);
-      showToast('Prenotazione non salvata. Controlla le regole Firestore e riprova.');
-    }
-  };
-
-  const deleteBooking = async (bookingId: string) => {
-    try {
-      await deleteDoc(doc(firestore, 'bookings', bookingId));
-      setBookings((current) => current.filter((item) => item.id !== bookingId));
-      showToast('Prenotazione cancellata con successo.');
-    } catch (err) {
-      console.error('Errore nella cancellazione:', err);
-      showToast('Impossibile cancellare la prenotazione. Riprova.');
-    }
-  };
-
-  const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setBookings([]);
-    showToast('Sei uscito da CityLive.');
-  };
-
-  const catalogError = [catalogErrors.venues, catalogErrors.events].filter(Boolean).join(' ');
-
-  if (!lang) {
-    return <LanguageSelector onSelect={handleSelectLanguage} />;
-  }
-
-  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterContent user={user} venues={venues} events={events} lang={lang} onSignIn={() => setAuthOpen(true)} onSignOut={() => void logout()} onChangeLang={() => setLang(null)} bookings={bookings} onBooking={requestBooking} onDeleteBooking={(id) => void deleteBooking(id)} />{authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => void startGoogleSignIn()} />}{bookingTarget && <BookingModal venue={bookingTarget.venue} event={bookingTarget.event} lang={lang} onClose={() => setBookingTarget(null)} onBooked={(booking) => void booked(booking)} />}{catalogError && <div className="toast" role="alert">{catalogError}</div>}{toast && <div className="toast" role="status">{toast}</div>}</WouterRouter>;
-}
-
-export default App;
