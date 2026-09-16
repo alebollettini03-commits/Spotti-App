@@ -95,7 +95,7 @@ const translations = {
     myBookings: 'Le mie prenotazioni',
     logout: 'Esci',
     searchPlaceholder: 'Cerca un locale o indirizzo',
-    showingIn: 'In programma stasera a',
+    showingIn: 'a',
     allSpots: 'Tutti i locali',
     bars: 'Bar',
     restaurants: 'Ristoranti',
@@ -115,6 +115,8 @@ const translations = {
     details: 'Dettagli',
     editorialTitle: 'Vivi la serata giusta.',
     editorialCopy: 'Scegli il tavolo o la pista da ballo perfetta per la tua serata.',
+    bookingEditorialTitle: 'I tuoi piani in un solo posto.',
+    bookingEditorialCopy: 'Gestisci le tue prenotazioni e organizza al meglio le tue prossime uscite.',
     localiConnected: 'locali connessi',
     eventsAvailable: 'eventi disponibili',
     bookThisEvent: 'Prenota questo evento',
@@ -151,7 +153,7 @@ const translations = {
     myBookings: 'My bookings',
     logout: 'Log out',
     searchPlaceholder: 'Search a place or address',
-    showingIn: 'Showing tonight in',
+    showingIn: 'in',
     allSpots: 'All spots',
     bars: 'Bars',
     restaurants: 'Restaurants',
@@ -171,6 +173,8 @@ const translations = {
     details: 'Details',
     editorialTitle: 'Do one thing properly tonight.',
     editorialCopy: 'Pick a room, a table or a dance floor that feels right.',
+    bookingEditorialTitle: 'All your plans in one place.',
+    bookingEditorialCopy: 'Manage your active reservations and plan your next night out.',
     localiConnected: 'connected venues',
     eventsAvailable: 'available events',
     bookThisEvent: 'Book this event',
@@ -413,7 +417,10 @@ function Explore({ venues, lang }: { venues: Venue[]; lang: Language }) {
         </Popup>
       </Marker>)}
       <ZoomControls />
-      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label="Search venues" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label><div className="map-note"><LocateFixed size={15} /><span>{t.showingIn} <strong>Teramo</strong></span></div></div>
+      <div className="map-topbar">
+        <label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label="Search venues" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label>
+        <div className="map-note"><LocateFixed size={15} /><span>{t.showingIn} <strong>Teramo</strong></span></div>
+      </div>
       <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])}><Icon size={13} /><span>{label}</span></button>; })}</div>
       {!venues.length && <div className="map-empty"><strong>{t.noVenues}</strong><span>{t.noVenuesSub}</span></div>}
     </MapContainer>
@@ -437,12 +444,33 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
   const eventVenue = (event: CityEvent) => venues.find((venue) => venue.name.trim().toLowerCase() === event.venueName.trim().toLowerCase());
   const today = new Date().toISOString().slice(0, 10);
 
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti editorial</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><div className="feature-stat"><div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div><div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div>
+  
+  <aside className="side-feature">
+    <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti editorial</span>
+    <h2>{t.editorialTitle}</h2>
+    <p>{t.editorialCopy}</p>
+    <div className="feature-stat">
+      <div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div>
+      <div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div>
+    </div>
+  </aside>
+  
+  </div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
 }
 
 function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; lang: Language; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
   const t = translations[lang];
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', items: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>{t.noPlans}</h2><p>{t.noPlansSub}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></div></div>}</main>;
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', items: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div>
+  
+  <aside className="side-feature">
+    <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti</span>
+    <h2>{t.bookingEditorialTitle}</h2>
+    <p>{t.bookingEditorialCopy}</p>
+    <button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button>
+  </aside>
+  
+  </div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>{t.noPlans}</h2><p>{t.noPlansSub}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></div></div>}</main>;
 }
 
 function RouterContent({ user, venues, events, lang, onSignIn, onSignOut, onChangeLang, bookings, onBooking, onDeleteBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void; onDeleteBooking: (bookingId: string) => void }) {
@@ -467,7 +495,11 @@ export default function App() {
   const [bookingTarget, setBookingTarget] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [pendingBooking, setPendingBooking] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [toast, setToast] = useState('');
-  const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3200); };
+
+  const showToast = (message: string) => { 
+    setToast(message); 
+    window.setTimeout(() => setToast(''), 3200); 
+  };
 
   const handleSelectLanguage = (selectedLang: Language) => {
     setLang(selectedLang);
@@ -545,27 +577,19 @@ export default function App() {
     }
   };
 
-  const handleSignOut = () => signOut(auth);
-
-  const handleStartBooking = (venue: Venue, event?: CityEvent) => {
-    if (!user) {
-      setPendingBooking({ venue, event });
-      setAuthOpen(true);
-
-      return;
-    }
-    setBookingTarget({ venue, event });
+  const handleSignOut = () => {
+    signOut(auth);
   };
 
-  const handleCreateBooking = async (bookingData: Booking) => {
+  const handleCreateBooking = async (booking: Booking) => {
     if (!user) return;
     try {
       const docRef = await addDoc(collection(firestore, 'bookings'), {
-        ...bookingData,
+        ...booking,
         userId: user.uid,
         createdAt: serverTimestamp(),
       });
-      setBookings((current) => [...current, { ...bookingData, id: docRef.id }]);
+      setBookings((prev) => [...prev, { ...booking, id: docRef.id }]);
       setBookingTarget(null);
       showToast(translations[lang || 'it'].bookingConfirmed);
     } catch (err) {
@@ -576,9 +600,18 @@ export default function App() {
   const handleDeleteBooking = async (bookingId: string) => {
     try {
       await deleteDoc(doc(firestore, 'bookings', bookingId));
-      setBookings((current) => current.filter((b) => b.id !== bookingId));
+      setBookings((prev) => prev.filter((item) => item.id !== bookingId));
     } catch (err) {
       console.error('Errore durante la cancellazione della prenotazione:', err);
+    }
+  };
+
+  const handleStartBooking = (venue: Venue, event?: CityEvent) => {
+    if (!user) {
+      setPendingBooking({ venue, event });
+      setAuthOpen(true);
+    } else {
+      setBookingTarget({ venue, event });
     }
   };
 
@@ -587,7 +620,7 @@ export default function App() {
   }
 
   return (
-    <WouterRouter>
+    <>
       <RouterContent
         user={user}
         venues={venues}
@@ -610,7 +643,7 @@ export default function App() {
           onBooked={handleCreateBooking}
         />
       )}
-      {toast && <div className="toast-notification">{toast}</div>}
-    </WouterRouter>
+      {toast && <div className="toast">{toast}</div>}
+    </>
   );
 }
