@@ -5,6 +5,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   where,
@@ -29,7 +30,6 @@ import {
   Plus,
   Search,
   Sparkles,
-  Star,
   Ticket,
   Utensils,
   X,
@@ -49,32 +49,25 @@ type VenueType = 'bar' | 'restaurant' | 'club';
 type Venue = {
   id: string;
   name: string;
-  type: VenueType;
-  neighborhood: string;
   address: string;
   hours: string;
-  rating: number;
-  price: string;
-  description: string;
   lat: number;
   lng: number;
-  color: string;
+  type: VenueType;
 };
 type CityEvent = {
   id: string;
-  venueId: string;
   title: string;
-  day: number;
-  month: string;
-  weekday: string;
+  venueName: string;
+  date: string;
   time: string;
   type: string;
-  description: string;
-  posterUrl: string;
+  posterUrl?: string;
 };
 type Booking = {
   id: string;
   venueId: string;
+  venueName?: string;
   date: string;
   time: string;
   guests: string;
@@ -86,33 +79,69 @@ type Booking = {
 };
 type User = { uid: string; name: string; email: string; photoURL?: string | null };
 
-const venues: Venue[] = [
-  { id: 'quattro-archi', name: 'Quattro Archi', type: 'bar', neighborhood: 'San Salvario', address: 'Via Baretti 22', hours: '18:00 – 02:00', rating: 4.8, price: '€€', description: 'A low-lit vermouth bar with precise pours, warm vinyl and the city’s best late-night people watching.', lat: 45.0528, lng: 7.6796, color: '#dc7b55' },
-  { id: 'casa-marmo', name: 'Casa Marmo', type: 'restaurant', neighborhood: 'Centro', address: 'Piazza Carlina 8', hours: '19:00 – 00:30', rating: 4.7, price: '€€€', description: 'Small plates, natural wine and a dining room that knows how to stretch dinner into the night.', lat: 45.0644, lng: 7.695, color: '#2b7468' },
-  { id: 'orbita', name: 'Orbita', type: 'club', neighborhood: 'Aurora', address: 'Corso Verona 14', hours: '23:00 – 04:00', rating: 4.6, price: '€€', description: 'An underground room for left-field dance music, poured concrete and unhurried mornings.', lat: 45.081, lng: 7.694, color: '#665e9b' },
-  { id: 'luna-piena', name: 'Luna Piena', type: 'bar', neighborhood: 'Vanchiglia', address: 'Via Santa Giulia 31', hours: '18:30 – 01:30', rating: 4.5, price: '€€', description: 'Cocktails by candlelight in a tiny room with a surprisingly good soundtrack.', lat: 45.0718, lng: 7.6975, color: '#dc7b55' },
-  { id: 'il-giro', name: 'Il Giro', type: 'restaurant', neighborhood: 'Crocetta', address: 'Via Magenta 17', hours: '19:30 – 23:30', rating: 4.4, price: '€€€', description: 'A neighborhood table for handmade pasta, bright sauces and one more bottle for the group.', lat: 45.0557, lng: 7.6722, color: '#2b7468' },
-  { id: 'tunnel-27', name: 'Tunnel 27', type: 'club', neighborhood: 'Dora', address: 'Via Cigna 27', hours: '23:30 – 05:00', rating: 4.7, price: '€€', description: 'A beloved basement with crisp sound, serious selectors and no dress code theatre.', lat: 45.0912, lng: 7.688, color: '#665e9b' },
-];
+const mapCenter: [number, number] = [42.6589, 13.7039];
 
-const events: CityEvent[] = [
-  { id: 'slow-jams', venueId: 'quattro-archi', title: 'Slow Jams / Fast Drinks', day: 24, month: 'OCT', weekday: 'THU', time: '19:30', type: 'Listening bar', description: 'An evening of soft soul records, guest selectors and vermouth flights.', posterUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=900&q=80' },
-  { id: 'pasta-club', venueId: 'il-giro', title: 'The Pasta Club', day: 25, month: 'OCT', weekday: 'FRI', time: '20:00', type: 'Dinner series', description: 'Six seats, three courses, one rotating pasta shape. This week: agnolotti del plin.', posterUrl: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=900&q=80' },
-  { id: 'orbiting', venueId: 'orbita', title: 'Orbiting: October Session', day: 26, month: 'OCT', weekday: 'SAT', time: '23:00', type: 'Club night', description: 'A patient, deep night with guests from Berlin and the local residents.', posterUrl: 'https://images.unsplash.com/photo-1571266028243-d220c9c3b97b?auto=format&fit=crop&w=900&q=80' },
-  { id: 'candlelight', venueId: 'luna-piena', title: 'Candlelight & Citrus', day: 27, month: 'OCT', weekday: 'SUN', time: '18:30', type: 'Cocktail workshop', description: 'Learn three bright, seasonal drinks around a communal table.', posterUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=900&q=80' },
-  { id: 'marmo-wine', venueId: 'casa-marmo', title: 'New Wave Piemonte', day: 29, month: 'OCT', weekday: 'TUE', time: '19:00', type: 'Wine tasting', description: 'A guided tasting of five new-school bottles with the people making them.', posterUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=900&q=80' },
-];
+function isVenueType(value: unknown): value is VenueType {
+  return value === 'bar' || value === 'restaurant' || value === 'club';
+}
 
-const mapCenter: [number, number] = [45.0703, 7.6869];
+function toDateString(value: unknown): string {
+  if (typeof value === 'string') return value.slice(0, 10);
+  if (value && typeof value === 'object') {
+    const timestamp = value as { toDate?: () => Date };
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().toISOString().slice(0, 10);
+    }
+  }
+  return '';
+}
+
+function readVenue(snapshot: { id: string; data: () => Record<string, unknown> }): Venue | null {
+  const data = snapshot.data();
+  const name = typeof data.name === 'string' ? data.name : '';
+  const address = typeof data.address === 'string' ? data.address : '';
+  const hours = typeof data.hours === 'string' ? data.hours : '';
+  const type = data.type;
+  const lat = Number(data.lat);
+  const lng = Number(data.lng);
+  if (!name || !address || !hours || !isVenueType(type) || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { id: snapshot.id, name, address, hours, lat, lng, type };
+}
+
+function readEvent(snapshot: { id: string; data: () => Record<string, unknown> }): CityEvent | null {
+  const data = snapshot.data();
+  const title = typeof data.title === 'string' ? data.title : '';
+  const venueName = typeof data.venueName === 'string' ? data.venueName : '';
+  const date = toDateString(data.date);
+  const time = typeof data.time === 'string' ? data.time : '';
+  const type = typeof data.type === 'string' ? data.type : '';
+  const posterUrl = typeof data.posterUrl === 'string' ? data.posterUrl : undefined;
+  if (!title || !venueName || !date || !time || !type) return null;
+  return { id: snapshot.id, title, venueName, date, time, type, posterUrl };
+}
+
+function venueColor(type: VenueType) {
+  return type === 'restaurant' ? '#2b7468' : type === 'club' ? '#665e9b' : '#dc7b55';
+}
 
 function venueIcon(venue: Venue, selected: boolean) {
   return L.divIcon({
     className: 'citylive-marker',
-    html: `<span class="leaflet-pin ${venue.type} ${selected ? 'selected' : ''}" style="--pin-color:${venue.color}"><span></span></span>`,
+    html: `<span class="leaflet-pin ${venue.type} ${selected ? 'selected' : ''}" style="--pin-color:${venueColor(venue.type)}"><span></span></span>`,
     iconSize: [34, 44],
     iconAnchor: [17, 42],
     popupAnchor: [0, -38],
   });
+}
+
+function formatEventDate(date: string) {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return { day: date, month: '', weekday: '' };
+  return {
+    day: new Intl.DateTimeFormat('it-IT', { day: '2-digit' }).format(parsed),
+    month: new Intl.DateTimeFormat('it-IT', { month: 'short' }).format(parsed).toUpperCase(),
+    weekday: new Intl.DateTimeFormat('it-IT', { weekday: 'short' }).format(parsed).toUpperCase(),
+  };
 }
 
 function ZoomControls() {
@@ -125,7 +154,7 @@ function ZoomControls() {
   );
 }
 
-function AppShell({ children, user, onSignIn, onSignOut }: { children: React.ReactNode; user: User | null; onSignIn: () => void; onSignOut: () => void }) {
+function AppShell({ children, user, eventsCount, onSignIn, onSignOut }: { children: React.ReactNode; user: User | null; eventsCount: number; onSignIn: () => void; onSignOut: () => void }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const nav = [
@@ -136,7 +165,7 @@ function AppShell({ children, user, onSignIn, onSignOut }: { children: React.Rea
   return <div className="app-shell">
     <header className="app-nav">
       <Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark"><Navigation size={17} /></span><span className="brand-name">CityLive</span><span className="brand-sub">Affluenza Locali</span></Link>
-      <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={14} /> {label}{label === 'Events' && <span className="nav-count">{events.length}</span>}</Link>)}</nav>
+      <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={14} /> {label}{label === 'Events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
       {user ? <div className="user-menu-wrap"><button className="user-button" onClick={() => setMenuOpen((open) => !open)} data-testid="button-user-menu"><span className="avatar">{user.name.charAt(0)}</span><span>Ciao, {user.name}</span></button>{menuOpen && <div className="user-menu" role="menu"><div className="user-menu-caption">{user.email}</div><Link href="/bookings" onClick={() => setMenuOpen(false)} role="menuitem"><Ticket size={14} /> Le mie prenotazioni</Link><button onClick={onSignOut} role="menuitem"><X size={14} /> Log out</button></div>}</div> : <button className="outline-button" onClick={onSignIn} data-testid="button-sign-in"><CircleUserRound size={15} /> Sign in</button>}
     </header>
     {children}
@@ -157,55 +186,64 @@ function SignInModal({ onClose, onSignIn }: { onClose: () => void; onSignIn: () 
 function BookingModal({ venue, event, onClose, onBooked }: { venue: Venue; event?: CityEvent; onClose: () => void; onBooked: (booking: Booking) => void }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [date, setDate] = useState(event ? `2026-10-${String(event.day).padStart(2, '0')}` : '2026-10-24');
-  const [time, setTime] = useState(event?.time ?? '20:00');
+  const [date, setDate] = useState(event?.date ?? '');
+  const [time, setTime] = useState(event?.time ?? '');
   const [guests, setGuests] = useState('2 guests');
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onBooked({ id: `booking-${Date.now()}`, venueId: venue.id, date, time, guests, status: 'confirmed', firstName, lastName, arrivalTime: venue.type === 'restaurant' ? time : undefined, eventTitle: event?.title });
+    onBooked({ id: `booking-${Date.now()}`, venueId: venue.id, venueName: venue.name, date, time, guests, status: 'confirmed', firstName, lastName, arrivalTime: venue.type === 'restaurant' ? time : undefined, eventTitle: event?.title });
   };
-  return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? 'Reserve your spot' : 'Make a plan'}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? event.time : 'Choose your time'}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form" data-testid="button-close-booking"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" /><div className="form-grid"><div className="field"><label htmlFor="booking-first-name">Nome</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required data-testid="input-booking-first-name" /></div><div className="field"><label htmlFor="booking-last-name">Cognome</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required data-testid="input-booking-last-name" /></div><div className="field"><label htmlFor="booking-date">Date</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required data-testid="input-booking-date" /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? 'Orario di arrivo' : 'Time'}</label><select id="booking-time" value={time} onChange={(e) => setTime(e.target.value)} required data-testid="select-booking-time"><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option><option>21:00</option><option>23:00</option></select></div><div className="field full"><label htmlFor="booking-guests">Party size</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)} data-testid="select-booking-guests"><option>1 guest</option><option>2 guests</option><option>3 guests</option><option>4 guests</option><option>5 guests</option><option>6 guests</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose} data-testid="button-cancel-booking">Not tonight</button><button type="submit" className="primary-button" data-testid="button-confirm-booking"><Check size={15} /> Confirm booking</button></div></form></Modal>;
+  return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? 'Reserve your spot' : 'Make a plan'}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? event.time : 'Choose your time'}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form" data-testid="button-close-booking"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" /><div className="form-grid"><div className="field"><label htmlFor="booking-first-name">Nome</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required data-testid="input-booking-first-name" /></div><div className="field"><label htmlFor="booking-last-name">Cognome</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required data-testid="input-booking-last-name" /></div><div className="field"><label htmlFor="booking-date">Date</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required data-testid="input-booking-date" /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? 'Orario di arrivo' : 'Time'}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required data-testid="select-booking-time" /></div><div className="field full"><label htmlFor="booking-guests">Party size</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}><option>1 guest</option><option>2 guests</option><option>3 guests</option><option>4 guests</option><option>5 guests</option><option>6 guests</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose} data-testid="button-cancel-booking">Not tonight</button><button type="submit" className="primary-button" data-testid="button-confirm-booking"><Check size={15} /> Confirm booking</button></div></form></Modal>;
 }
 
-function Explore() {
+function Explore({ venues }: { venues: Venue[] }) {
   const [, setLocation] = useLocation();
   const [activeFilters, setActiveFilters] = useState<VenueType[]>([]);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Venue | null>(venues[0]);
-  const filtered = useMemo(() => venues.filter((venue) => (!activeFilters.length || activeFilters.includes(venue.type)) && `${venue.name} ${venue.neighborhood}`.toLowerCase().includes(search.toLowerCase())), [activeFilters, search]);
+  const [selected, setSelected] = useState<Venue | null>(null);
+  useEffect(() => {
+    setSelected((current) => current && venues.some((venue) => venue.id === current.id) ? current : venues[0] ?? null);
+  }, [venues]);
+  const filtered = useMemo(() => venues.filter((venue) => (!activeFilters.length || activeFilters.includes(venue.type)) && `${venue.name} ${venue.address}`.toLowerCase().includes(search.toLowerCase())), [activeFilters, search, venues]);
   const filters = [{ key: 'all' as const, label: 'All spots', icon: Sparkles }, { key: 'bar' as const, label: 'Bars', icon: GlassWater }, { key: 'restaurant' as const, label: 'Restaurants', icon: Utensils }, { key: 'club' as const, label: 'Clubs', icon: Ticket }];
   return <main className="map-page">
-    <MapContainer center={mapCenter} zoom={13} minZoom={11} maxZoom={18} zoomControl={false} className="map-canvas" scrollWheelZoom>
+    <MapContainer center={mapCenter} zoom={14} minZoom={11} maxZoom={18} zoomControl={false} className="map-canvas" scrollWheelZoom>
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {filtered.map((venue) => <Marker key={venue.id} position={[venue.lat, venue.lng]} icon={venueIcon(venue, selected?.id === venue.id)} eventHandlers={{ click: () => setSelected(venue) }}>
         <Popup>
-          <div className="leaflet-popup-content-inner"><span className="eyebrow">{venue.type} · {venue.price}</span><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours} · {venue.rating} rating</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> Portami qui</a></div>
+          <div className="leaflet-popup-content-inner"><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> Portami qui</a></div>
         </Popup>
       </Marker>)}
       <ZoomControls />
-      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a place or neighborhood" aria-label="Search venues" data-testid="input-map-search" /><span className="eyebrow" style={{ fontSize: 9 }}>Torino</span></label><div className="map-note"><LocateFixed size={15} /><span>Showing tonight in <strong>Torino</strong></span></div></div>
+      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a place or address" aria-label="Search venues" data-testid="input-map-search" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label><div className="map-note"><LocateFixed size={15} /><span>Showing tonight in <strong>Teramo</strong></span></div></div>
       <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])} data-testid={`button-filter-${key}`}><Icon size={13} /><span>{label}</span></button>; })}</div>
+      {!venues.length && <div className="map-empty"><strong>Nessun locale disponibile</strong><span>I locali Firestore appariranno qui in tempo reale.</span></div>}
     </MapContainer>
-    {selected && <section className="map-panel" data-testid={`card-venue-${selected.id}`}><div className="panel-image"><div className="panel-image-text">{selected.neighborhood}</div></div><div className="panel-body"><div className="eyebrow">{selected.type} · {selected.price}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><Star size={12} fill="currentColor" /> {selected.rating} rating</span><span className="meta-item"><MapPin size={12} /> {selected.address}</span></div><p className="panel-description">{selected.description}</p><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)} data-testid="button-view-venue-events"><CalendarDays size={14} /> See events</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer" data-testid="button-directions"><Navigation size={14} /> Portami qui</a></div></div></section>}
+    {selected && <section className="map-panel" data-testid={`card-venue-${selected.id}`}><div className="panel-image"><div className="panel-image-text">{selected.type}</div></div><div className="panel-body"><div className="eyebrow">{selected.type}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><MapPin size={12} /> {selected.address}</span><span className="meta-item"><Clock3 size={12} /> {selected.hours}</span></div><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)} data-testid="button-view-venue-events"><CalendarDays size={14} /> See events</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer" data-testid="button-directions"><Navigation size={14} /> Portami qui</a></div></div></section>}
   </main>;
 }
 
-function EventsPage({ onBook }: { onBook: (venue: Venue, event?: CityEvent) => void }) {
-  const [selectedDay, setSelectedDay] = useState(24);
+function EventsPage({ events, venues, onBook }: { events: CityEvent[]; venues: Venue[]; onBook: (venue: Venue, event?: CityEvent) => void }) {
+  const [selectedDate, setSelectedDate] = useState('');
   const [eventDetail, setEventDetail] = useState<CityEvent | null>(null);
-  const days = [{ day: 24, month: 'OCT', week: 'THU' }, { day: 25, month: 'OCT', week: 'FRI' }, { day: 26, month: 'OCT', week: 'SAT' }, { day: 27, month: 'OCT', week: 'SUN' }, { day: 29, month: 'OCT', week: 'TUE' }];
-  const shown = events.filter((event) => event.day === selectedDay);
-  const eventVenue = (event: CityEvent) => venues.find((venue) => venue.id === event.venueId) ?? venues[0];
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">The city is on</span><h1 className="page-title">Plans with a pulse.</h1><p className="page-copy">Dated things worth leaving the house for, from first aperitivo to last dance.</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDay(24)} data-testid="button-today">Oggi</button><Link href="/" className="outline-button" data-testid="link-back-to-map"><MapPin size={14} /> Browse map</Link></div></div><div className="date-strip">{days.map((date) => <button key={date.day} className={`date-button ${selectedDay === date.day ? 'active' : ''}`} onClick={() => setSelectedDay(date.day)} data-testid={`button-date-${date.day}`}><strong>{date.day}</strong><span>{date.week} · {date.month}</span></button>)}</div><div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-event-${event.id}`}><div className="event-poster" style={{ backgroundImage: `url(${event.posterUrl})` }}><span>{event.type}</span></div><div className="event-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{eventVenue(event).name}</strong> · {event.time} · {eventVenue(event).neighborhood}</p></div><button className="primary-button" onClick={() => setEventDetail(event)} data-testid={`button-event-details-${event.id}`}>Details</button></article>) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>A quieter date.</h2><p>Nothing is listed for this day yet. Try the next one — the city tends to get interesting after dark.</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive editorial</span><h2>Do one thing properly tonight.</h2><p>Skip the endless scroll. Pick a room, a table or a dance floor that feels like a story already in progress.</p><div className="feature-stat"><div><strong>36</strong><span>places open late</span></div><div><strong>12</strong><span>things this week</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{eventDetail.weekday} · {eventDetail.day} {eventDetail.month}</span><h2>{eventDetail.title}</h2><p>{eventVenue(eventDetail).name} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details" data-testid="button-close-event"><X size={17} /></button></div><div className="modal-body"><p className="page-copy" style={{ maxWidth: 'none' }}>{eventDetail.description}</p><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail).address}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div><button className="primary-button" onClick={() => { setEventDetail(null); onBook(eventVenue(eventDetail), eventDetail); }} data-testid={`button-book-event-${eventDetail.id}`}><Ticket size={14} /> Book this event</button></div></Modal>}</main>;
+  const dates = useMemo(() => [...new Set(events.map((event) => event.date))].sort(), [events]);
+  useEffect(() => {
+    if (!dates.length) setSelectedDate('');
+    else if (!dates.includes(selectedDate)) setSelectedDate(dates[0]);
+  }, [dates, selectedDate]);
+  const shown = events.filter((event) => event.date === selectedDate);
+  const eventVenue = (event: CityEvent) => venues.find((venue) => venue.name.trim().toLowerCase() === event.venueName.trim().toLowerCase());
+  const today = new Date().toISOString().slice(0, 10);
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">The city is on</span><h1 className="page-title">Plans with a pulse.</h1><p className="page-copy">Dated things worth leaving the house for, from first aperitivo to last dance.</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)} data-testid="button-today">Oggi</button><Link href="/" className="outline-button" data-testid="link-back-to-map"><MapPin size={14} /> Browse map</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)} data-testid={`button-date-${date}`}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>Nessun evento disponibile.</h2><p>Gli eventi Firestore appariranno qui in tempo reale.</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-event-${event.id}`}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)} data-testid={`button-event-details-${event.id}`}>Details</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>A quieter date.</h2><p>Nothing is listed for this day yet. Try another date.</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive editorial</span><h2>Do one thing properly tonight.</h2><p>Skip the endless scroll. Pick a room, a table or a dance floor that feels like a story already in progress.</p><div className="feature-stat"><div><strong>{venues.length}</strong><span>locali connessi</span></div><div><strong>{events.length}</strong><span>eventi disponibili</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details" data-testid="button-close-event"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }} data-testid={`button-book-event-${eventDetail.id}`}><Ticket size={14} /> Book this event</button> : <p className="page-copy">Il locale non è presente nella collezione venues.</p>}</div></Modal>}</main>;
 }
 
-function BookingsPage({ bookings, onExplore }: { bookings: Booking[]; onExplore: () => void }) {
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Your CityLive</span><h1 className="page-title">Plans in motion.</h1><p className="page-copy">Your confirmed tables, rooms and reasons to get out.</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId) ?? venues[0]; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-booking-${booking.id}`}><div className="booking-badge">{venue.type === 'restaurant' ? <Utensils size={22} /> : venue.type === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venue.type}</span><h3>{venue.name}</h3><p>{booking.date} · {booking.time}<br />{booking.guests} · {venue.address}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><span className="status-tag"><Check size={10} /> {booking.status}</span></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>A small nudge</span><h2>Leave room for a little spontaneity.</h2><p>Plans are better when they have somewhere to start. Find a new favorite room for the next one.</p><button className="primary-button" onClick={onExplore} data-testid="button-explore-more"><Compass size={14} /> Explore the city</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>No plans yet.</h2><p>Your next good night is probably one short walk away. Find a table, a drink or a dance floor.</p><button className="primary-button" onClick={onExplore} data-testid="button-empty-explore"><Compass size={14} /> Explore tonight</button></div></div>}</main>;
+function BookingsPage({ bookings, venues, onExplore }: { bookings: Booking[]; venues: Venue[]; onExplore: () => void }) {
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Your CityLive</span><h1 className="page-title">Plans in motion.</h1><p className="page-copy">Your confirmed tables, rooms and reasons to get out.</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-booking-${booking.id}`}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><span className="status-tag"><Check size={10} /> {booking.status}</span></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>A small nudge</span><h2>Leave room for a little spontaneity.</h2><p>Plans are better when they have somewhere to start. Find a new favorite room for the next one.</p><button className="primary-button" onClick={onExplore} data-testid="button-explore-more"><Compass size={14} /> Explore the city</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>No plans yet.</h2><p>Your next good night is probably one short walk away. Find a table, a drink or a dance floor.</p><button className="primary-button" onClick={onExplore} data-testid="button-empty-explore"><Compass size={14} /> Explore tonight</button></div></div>}</main>;
 }
 
-function RouterContent({ user, onSignIn, onSignOut, bookings, onBooking }: { user: User | null; onSignIn: () => void; onSignOut: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void }) {
+function RouterContent({ user, venues, events, onSignIn, onSignOut, bookings, onBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; onSignIn: () => void; onSignOut: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void }) {
   const [, setLocation] = useLocation();
-  return <AppShell user={user} onSignIn={onSignIn} onSignOut={onSignOut}><Switch><Route path="/" component={Explore} /><Route path="/events"><EventsPage onBook={onBooking} /></Route><Route path="/bookings"><BookingsPage bookings={bookings} onExplore={() => setLocation('/')} /></Route><Route><div className="page"><div className="empty-state"><div><div className="empty-icon"><Compass size={24} /></div><h2>That street is a little lost.</h2><p>Let’s get you back to the map.</p><Link href="/" className="primary-button" data-testid="link-not-found-home">Back to explore</Link></div></div></div></Route></Switch></AppShell>;
+  return <AppShell user={user} eventsCount={events.length} onSignIn={onSignIn} onSignOut={onSignOut}><Switch><Route path="/"><Explore venues={venues} /></Route><Route path="/events"><EventsPage events={events} venues={venues} onBook={onBooking} /></Route><Route path="/bookings"><BookingsPage bookings={bookings} venues={venues} onExplore={() => setLocation('/')} /></Route><Route><div className="page"><div className="empty-state"><div><div className="empty-icon"><Compass size={24} /></div><h2>That street is a little lost.</h2><p>Let’s get you back to the map.</p><Link href="/" className="primary-button" data-testid="link-not-found-home">Back to explore</Link></div></div></div></Route></Switch></AppShell>;
 }
 
 function authUser(user: FirebaseUser): User {
@@ -214,7 +252,10 @@ function authUser(user: FirebaseUser): User {
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [events, setEvents] = useState<CityEvent[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [catalogErrors, setCatalogErrors] = useState({ venues: '', events: '' });
   const [authOpen, setAuthOpen] = useState(false);
   const [bookingTarget, setBookingTarget] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [pendingBooking, setPendingBooking] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
@@ -222,6 +263,22 @@ function App() {
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3200); };
 
   useEffect(() => onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser ? authUser(firebaseUser) : null)), []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(firestore, 'venues'), (snapshot) => {
+      setVenues(snapshot.docs.map(readVenue).filter((venue): venue is Venue => venue !== null));
+      setCatalogErrors((current) => ({ ...current, venues: '' }));
+    }, () => setCatalogErrors((current) => ({ ...current, venues: 'Impossibile leggere la collezione venues.' })));
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(firestore, 'events'), (snapshot) => {
+      setEvents(snapshot.docs.map(readEvent).filter((event): event is CityEvent => event !== null));
+      setCatalogErrors((current) => ({ ...current, events: '' }));
+    }, () => setCatalogErrors((current) => ({ ...current, events: 'Impossibile leggere la collezione events.' })));
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!user) { setBookings([]); return; }
@@ -283,7 +340,8 @@ function App() {
     showToast('Sei uscito da CityLive.');
   };
 
-  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterContent user={user} onSignIn={() => setAuthOpen(true)} onSignOut={() => void logout()} bookings={bookings} onBooking={requestBooking} />{authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => void startGoogleSignIn()} />}{bookingTarget && <BookingModal venue={bookingTarget.venue} event={bookingTarget.event} onClose={() => setBookingTarget(null)} onBooked={(booking) => void booked(booking)} />}{toast && <div className="toast" role="status" data-testid="status-toast">{toast}</div>}</WouterRouter>;
+  const catalogError = [catalogErrors.venues, catalogErrors.events].filter(Boolean).join(' ');
+  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterContent user={user} venues={venues} events={events} onSignIn={() => setAuthOpen(true)} onSignOut={() => void logout()} bookings={bookings} onBooking={requestBooking} />{authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => void startGoogleSignIn()} />}{bookingTarget && <BookingModal venue={bookingTarget.venue} event={bookingTarget.event} onClose={() => setBookingTarget(null)} onBooked={(booking) => void booked(booking)} />}{catalogError && <div className="toast" role="alert" data-testid="status-catalog-error">{catalogError}</div>}{toast && <div className="toast" role="status" data-testid="status-toast">{toast}</div>}</WouterRouter>;
 }
 
 export default App;

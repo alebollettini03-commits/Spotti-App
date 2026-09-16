@@ -1,6 +1,6 @@
 # CityLive Affluenza Locali
 
-CityLive helps people discover places with atmosphere in Torino, browse events, and save their plans.
+CityLive helps people discover places with atmosphere in Teramo, browse events, and save their plans.
 
 ## Run & Operate
 
@@ -29,13 +29,13 @@ CityLive helps people discover places with atmosphere in Torino, browse events, 
 
 ## Architecture decisions
 
-- Leaflet and OpenStreetMap power the discovery map; venue coordinates are kept in the local demo catalog so the first view is useful without an admin surface.
+- Leaflet and OpenStreetMap power the discovery map; venues and events are read from Firestore in real time.
 - Google sign-in and booking persistence use the provided Firebase project; Firestore bookings are scoped by the authenticated user's UID.
 - Expired bookings are deleted when the user's bookings are loaded, keeping the personal plan list current without a scheduled job.
 
 ## Product
 
-- Full-screen Torino map with venue categories, search, marker popups, directions, and selected venue details.
+- Full-screen Teramo map with venue categories, search, marker popups, directions, and selected venue details.
 - Event discovery by date, event details, Google-authenticated booking, and personal booking history.
 
 ## User preferences

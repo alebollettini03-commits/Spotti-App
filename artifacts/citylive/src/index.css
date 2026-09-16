@@ -278,6 +278,10 @@
 .leaflet-popup-content-inner > span:not(.eyebrow) { color: #63716e; }
 .leaflet-popup-content-inner a { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; color: #2b7468; font-weight: 800; text-decoration: none; }
 .leaflet-popup-content-inner a:hover { color: #173f43; }
+.map-empty { position: absolute; z-index: 500; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; gap: 6px; min-width: 230px; padding: 18px; text-align: center; background: rgba(250,248,242,.95); border: 1px solid rgba(255,255,255,.85); border-radius: 14px; box-shadow: 0 14px 35px rgba(29,56,48,.15); color: #172123; }
+.map-empty span { color: #63716e; font-size: 11px; }
+.event-poster-empty { background: linear-gradient(135deg, #173f43, #2b7468); }
+.compact-empty { min-height: 180px; margin-bottom: 21px; }
 @media (max-width: 800px) {
   .map-canvas.leaflet-container { height: calc(100dvh - 66px); min-height: calc(100dvh - 66px); }
   .map-canvas .map-topbar { top: 14px; }
