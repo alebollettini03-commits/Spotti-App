@@ -23,6 +23,7 @@ import {
   Clock3,
   Compass,
   GlassWater,
+  Globe,
   LocateFixed,
   MapPin,
   Minus,
@@ -41,10 +42,13 @@ import {
   Popup,
   TileLayer,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
 import { firestore, auth, googleProvider } from './lib/firebase';
 import L from 'leaflet';
+
+type Language = 'it' | 'en';
 
 type VenueType = 'bar' | 'restaurant' | 'club';
 type Venue = {
@@ -81,6 +85,123 @@ type Booking = {
 type User = { uid: string; name: string; email: string; photoURL?: string | null };
 
 const mapCenter: [number, number] = [42.6589, 13.7039];
+
+const translations = {
+  it: {
+    explore: 'Esplora',
+    events: 'Eventi',
+    bookings: 'Prenotazioni',
+    subTitle: 'Affluenza Locali',
+    signIn: 'Accedi',
+    myBookings: 'Le mie prenotazioni',
+    logout: 'Esci',
+    searchPlaceholder: 'Cerca un locale o indirizzo',
+    showingIn: 'In programma stasera a',
+    allSpots: 'Tutti i locali',
+    bars: 'Bar',
+    restaurants: 'Ristoranti',
+    clubs: 'Club',
+    noVenues: 'Nessun locale disponibile',
+    noVenuesSub: 'I locali Firestore appariranno qui in tempo reale.',
+    seeEvents: 'Vedi eventi',
+    takeMeThere: 'Portami qui',
+    plansWithPulse: 'La città prende vita.',
+    datedThings: 'Eventi e appuntamenti da non perdere in città.',
+    today: 'Oggi',
+    browseMap: 'Mappa',
+    noEvents: 'Nessun evento disponibile.',
+    noEventsSub: 'Gli eventi appariranno qui in tempo reale.',
+    quieterDate: 'Nessun evento.',
+    quieterDateSub: 'Non c\'è nulla in programma per questa data.',
+    details: 'Dettagli',
+    editorialTitle: 'Vivi la serata giusta.',
+    editorialCopy: 'Scegli il tavolo o la pista da ballo perfetta per la tua serata.',
+    localiConnected: 'locali connessi',
+    eventsAvailable: 'eventi disponibili',
+    bookThisEvent: 'Prenota questo evento',
+    notInVenues: 'Il locale non è presente nella collezione venues.',
+    plansInMotion: 'Le tue prenotazioni.',
+    plansInMotionCopy: 'Tutti i tuoi tavoli e appuntamenti confermati.',
+    noPlans: 'Nessuna prenotazione.',
+    noPlansSub: 'Trova subito un tavolo o una serata speciale.',
+    exploreTonight: 'Esplora stasera',
+    cancelBooking: 'Cancella prenotazione',
+    bookingConfirmed: 'Prenotazione confermata.',
+    guest: 'persona',
+    guests: 'persone',
+    reserveSpot: 'Prenota il tuo posto',
+    makePlan: 'Fai una prenotazione',
+    eventStart: 'Inizio evento',
+    chooseTime: 'Scegli orario',
+    firstName: 'Nome',
+    lastName: 'Cognome',
+    date: 'Data',
+    time: 'Orario',
+    arrivalTime: 'Orario di arrivo',
+    partySize: 'Numero di persone',
+    notTonight: 'Annulla',
+    confirmBooking: 'Conferma prenotazione',
+    invalidTime: 'Orario non valido. L\'evento inizia alle',
+    invalidTimeSub: 'e non sono accettate prenotazioni precedenti.',
+  },
+  en: {
+    explore: 'Explore',
+    events: 'Events',
+    bookings: 'Bookings',
+    subTitle: 'Venue Footfall',
+    signIn: 'Sign in',
+    myBookings: 'My bookings',
+    logout: 'Log out',
+    searchPlaceholder: 'Search a place or address',
+    showingIn: 'Showing tonight in',
+    allSpots: 'All spots',
+    bars: 'Bars',
+    restaurants: 'Restaurants',
+    clubs: 'Clubs',
+    noVenues: 'No venues available',
+    noVenuesSub: 'Firestore venues will appear here in real time.',
+    seeEvents: 'See events',
+    takeMeThere: 'Get directions',
+    plansWithPulse: 'Plans with a pulse.',
+    datedThings: 'Dated things worth leaving the house for.',
+    today: 'Today',
+    browseMap: 'Browse map',
+    noEvents: 'No events available.',
+    noEventsSub: 'Firestore events will appear here in real time.',
+    quieterDate: 'A quieter date.',
+    quieterDateSub: 'Nothing is listed for this day yet.',
+    details: 'Details',
+    editorialTitle: 'Do one thing properly tonight.',
+    editorialCopy: 'Pick a room, a table or a dance floor that feels right.',
+    localiConnected: 'connected venues',
+    eventsAvailable: 'available events',
+    bookThisEvent: 'Book this event',
+    notInVenues: 'Venue not found in database.',
+    plansInMotion: 'Plans in motion.',
+    plansInMotionCopy: 'Your confirmed tables and reservations.',
+    noPlans: 'No plans yet.',
+    noPlansSub: 'Your next good night is one short walk away.',
+    exploreTonight: 'Explore tonight',
+    cancelBooking: 'Cancel booking',
+    bookingConfirmed: 'Booking confirmed.',
+    guest: 'guest',
+    guests: 'guests',
+    reserveSpot: 'Reserve your spot',
+    makePlan: 'Make a plan',
+    eventStart: 'Event start',
+    chooseTime: 'Choose your time',
+    firstName: 'First Name',
+    lastName: 'Last Name',
+    date: 'Date',
+    time: 'Time',
+    arrivalTime: 'Arrival Time',
+    partySize: 'Party size',
+    notTonight: 'Cancel',
+    confirmBooking: 'Confirm booking',
+    invalidTime: 'Invalid time. The event starts at',
+    invalidTimeSub: 'and earlier bookings are not allowed.',
+  }
+};
 
 function isVenueType(value: unknown): value is VenueType {
   return value === 'bar' || value === 'restaurant' || value === 'club';
@@ -135,42 +256,90 @@ function venueIcon(venue: Venue, selected: boolean) {
   });
 }
 
-function formatEventDate(date: string) {
+function formatEventDate(date: string, lang: Language) {
   const parsed = new Date(`${date}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return { day: date, month: '', weekday: '' };
+  const locale = lang === 'it' ? 'it-IT' : 'en-US';
   return {
-    day: new Intl.DateTimeFormat('it-IT', { day: '2-digit' }).format(parsed),
-    month: new Intl.DateTimeFormat('it-IT', { month: 'short' }).format(parsed).toUpperCase(),
-    weekday: new Intl.DateTimeFormat('it-IT', { weekday: 'short' }).format(parsed).toUpperCase(),
+    day: new Intl.DateTimeFormat(locale, { day: '2-digit' }).format(parsed),
+    month: new Intl.DateTimeFormat(locale, { month: 'short' }).format(parsed).toUpperCase(),
+    weekday: new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(parsed).toUpperCase(),
   };
+}
+
+function MapClickHandler({ onClick }: { onClick: () => void }) {
+  useMapEvents({
+    click: () => {
+      onClick();
+    },
+  });
+  return null;
+}
+
+function LanguageSelector({ onSelect }: { onSelect: (lang: Language) => void }) {
+  return (
+    <div className="modal-backdrop" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', zIndex: 9999 }}>
+      <div className="modal" style={{ maxWidth: '420px', textAlign: 'center', padding: '36px 24px' }}>
+        <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', backgroundColor: 'rgba(43, 116, 104, 0.1)', color: '#2b7468', marginBottom: '16px' }}>
+          <Globe size={32} />
+        </div>
+        <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Seleziona la lingua</h2>
+        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '28px' }}>Select your preferred language to enter CityLive</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <button
+            className="primary-button"
+            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '16px' }}
+            onClick={() => onSelect('it')}
+          >
+            🇮🇹 &nbsp; Italiano
+          </button>
+          <button
+            className="outline-button"
+            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '16px' }}
+            onClick={() => onSelect('en')}
+          >
+            🇬🇧 &nbsp; English
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ZoomControls() {
   const map = useMap();
   return (
     <div className="map-zoom">
-      <button className="icon-button" onClick={() => map.zoomIn()} aria-label="Zoom in" data-testid="button-map-zoom-in"><Plus size={16} /></button>
-      <button className="icon-button" onClick={() => map.zoomOut()} aria-label="Zoom out" data-testid="button-map-zoom-out"><Minus size={16} /></button>
+      <button className="icon-button" onClick={() => map.zoomIn()} aria-label="Zoom in"><Plus size={16} /></button>
+      <button className="icon-button" onClick={() => map.zoomOut()} aria-label="Zoom out"><Minus size={16} /></button>
     </div>
   );
 }
 
-function AppShell({ children, user, eventsCount, onSignIn, onSignOut }: { children: React.ReactNode; user: User | null; eventsCount: number; onSignIn: () => void; onSignOut: () => void }) {
+function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onChangeLang }: { children: React.ReactNode; user: User | null; eventsCount: number; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = translations[lang];
+
   const nav = [
-    { href: '/', label: 'Explore', icon: Compass },
-    { href: '/events', label: 'Events', icon: CalendarDays },
-    { href: '/bookings', label: 'Bookings', icon: Ticket },
+    { href: '/', label: t.explore, icon: Compass },
+    { href: '/events', label: t.events, icon: CalendarDays },
+    { href: '/bookings', label: t.bookings, icon: Ticket },
   ];
+
   return <div className="app-shell">
     <header className="app-nav">
-      <Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark"><Navigation size={17} /></span><span className="brand-name">CityLive</span><span className="brand-sub">Affluenza Locali</span></Link>
-      <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={14} /> {label}{label === 'Events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
-      {user ? <div className="user-menu-wrap"><button className="user-button" onClick={() => setMenuOpen((open) => !open)} data-testid="button-user-menu"><span className="avatar">{user.name.charAt(0)}</span><span>Ciao, {user.name}</span></button>{menuOpen && <div className="user-menu" role="menu"><div className="user-menu-caption">{user.email}</div><Link href="/bookings" onClick={() => setMenuOpen(false)} role="menuitem"><Ticket size={14} /> Le mie prenotazioni</Link><button onClick={onSignOut} role="menuitem"><X size={14} /> Log out</button></div>}</div> : <button className="outline-button" onClick={onSignIn} data-testid="button-sign-in"><CircleUserRound size={15} /> Sign in</button>}
+      <Link href="/" className="brand"><span className="brand-mark"><Navigation size={17} /></span><span className="brand-name">CityLive</span><span className="brand-sub">{t.subTitle}</span></Link>
+      <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`}><Icon size={14} /> {label}{href === '/events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button className="icon-button" onClick={onChangeLang} title="Cambia lingua / Change language">
+          <Globe size={16} />
+        </button>
+        {user ? <div className="user-menu-wrap"><button className="user-button" onClick={() => setMenuOpen((open) => !open)}><span className="avatar">{user.name.charAt(0)}</span><span>{user.name}</span></button>{menuOpen && <div className="user-menu" role="menu"><div className="user-menu-caption">{user.email}</div><Link href="/bookings" onClick={() => setMenuOpen(false)} role="menuitem"><Ticket size={14} /> {t.myBookings}</Link><button onClick={onSignOut} role="menuitem"><X size={14} /> {t.logout}</button></div>}</div> : <button className="outline-button" onClick={onSignIn}><CircleUserRound size={15} /> {t.signIn}</button>}
+      </div>
     </header>
     {children}
-    <nav className="mobile-nav" aria-label="Mobile navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${label.toLowerCase()}`}><Icon size={16} /><span>{label}</span></Link>)}</nav>
+    <nav className="mobile-nav" aria-label="Mobile navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''}><Icon size={16} /><span>{label}</span></Link>)}</nav>
   </div>;
 }
 
@@ -181,25 +350,27 @@ function Modal({ children, onClose, label }: { children: React.ReactNode; onClos
 }
 
 function SignInModal({ onClose, onSignIn }: { onClose: () => void; onSignIn: () => void }) {
-  return <Modal onClose={onClose} label="Sign in to CityLive"><div className="modal-head"><div><span className="eyebrow">Your night, saved</span><h2>Keep the good plans.</h2><p>Sign in to book tables and keep every reservation in one place.</p></div><button className="icon-button" onClick={onClose} aria-label="Close sign in" data-testid="button-close-signin"><X size={17} /></button></div><div className="modal-body"><div className="signin-box"><Sparkles size={22} /><h3>Continue with Google</h3><p>We use your Google account to make bookings personal. No password to remember, no inbox noise.</p><button className="primary-button" onClick={onSignIn} data-testid="button-google-signin">Continue with Google</button></div></div></Modal>;
+  return <Modal onClose={onClose} label="Sign in to CityLive"><div className="modal-head"><div><span className="eyebrow">Your night, saved</span><h2>Keep the good plans.</h2><p>Sign in to book tables and keep every reservation in one place.</p></div><button className="icon-button" onClick={onClose} aria-label="Close sign in"><X size={17} /></button></div><div className="modal-body"><div className="signin-box"><Sparkles size={22} /><h3>Continue with Google</h3><p>We use your Google account to make bookings personal. No password to remember, no inbox noise.</p><button className="primary-button" onClick={onSignIn}>Continue with Google</button></div></div></Modal>;
 }
 
-function BookingModal({ venue, event, onClose, onBooked }: { venue: Venue; event?: CityEvent; onClose: () => void; onBooked: (booking: Booking) => void }) {
+function BookingModal({ venue, event, lang, onClose, onBooked }: { venue: Venue; event?: CityEvent; lang: Language; onClose: () => void; onBooked: (booking: Booking) => void }) {
+  const t = translations[lang];
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [date, setDate] = useState(event?.date ?? '');
-  const [time, setTime] = useState(event?.time ?? '');
-  const [guests, setGuests] = useState('2 guests');
+  const [time, setTime] = useState(event?.time ? (event.time.match(/\d{2}:\d{2}/)?.[0] ?? event.time) : '');
+  const [guests, setGuests] = useState(`2 ${t.guests}`);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const eventStartTime = event?.time?.match(/\d{2}:\d{2}/)?.[0] ?? event?.time;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    // Validazione dell'orario rispetto all'evento
-    if (event?.time && time) {
-      if (time < event.time) {
-        setErrorMessage(`Orario non valido. L'evento inizia alle ${event.time} e non sono accettate prenotazioni precedenti.`);
+    if (eventStartTime && time) {
+      if (time < eventStartTime) {
+        setErrorMessage(`${t.invalidTime} ${eventStartTime} ${t.invalidTimeSub}`);
         return;
       }
     }
@@ -210,7 +381,7 @@ function BookingModal({ venue, event, onClose, onBooked }: { venue: Venue; event
       venueName: venue.name,
       date: date || new Date().toISOString().slice(0, 10),
       time: time || '19:30',
-      guests: guests || '2 guests',
+      guests: guests || `2 ${t.guests}`,
       status: 'confirmed',
       firstName: firstName || '',
       lastName: lastName || '',
@@ -219,57 +390,66 @@ function BookingModal({ venue, event, onClose, onBooked }: { venue: Venue; event
     });
   };
 
-  return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? 'Reserve your spot' : 'Make a plan'}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? `Inizio evento: ${event.time}` : 'Choose your time'}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form" data-testid="button-close-booking"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" />{errorMessage && <div style={{ color: '#d32f2f', backgroundColor: '#fde8e8', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', fontWeight: 500 }}>{errorMessage}</div>}<div className="form-grid"><div className="field"><label htmlFor="booking-first-name">Nome</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required data-testid="input-booking-first-name" /></div><div className="field"><label htmlFor="booking-last-name">Cognome</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required data-testid="input-booking-last-name" /></div><div className="field"><label htmlFor="booking-date">Date</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required data-testid="input-booking-date" /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? 'Orario di arrivo' : 'Time'}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required data-testid="select-booking-time" /></div><div className="field full"><label htmlFor="booking-guests">Party size</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}><option>1 guest</option><option>2 guests</option><option>3 guests</option><option>4 guests</option><option>5 guests</option><option>6 guests</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose} data-testid="button-cancel-booking">Not tonight</button><button type="submit" className="primary-button" data-testid="button-confirm-booking"><Check size={15} /> Confirm booking</button></div></form></Modal>;
+  return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? t.reserveSpot : t.makePlan}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? `${t.eventStart}: ${event.time}` : t.chooseTime}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" />{errorMessage && <div style={{ color: '#d32f2f', backgroundColor: '#fde8e8', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', fontWeight: 500 }}>{errorMessage}</div>}<div className="form-grid"><div className="field"><label htmlFor="booking-first-name">{t.firstName}</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div><div className="field"><label htmlFor="booking-last-name">{t.lastName}</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div><div className="field"><label htmlFor="booking-date">{t.date}</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? t.arrivalTime : t.time}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div><div className="field full"><label htmlFor="booking-guests">{t.partySize}</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}><option>1 {t.guest}</option><option>2 {t.guests}</option><option>3 {t.guests}</option><option>4 {t.guests}</option><option>5 {t.guests}</option><option>6 {t.guests}</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose}>{t.notTonight}</button><button type="submit" className="primary-button"><Check size={15} /> {t.confirmBooking}</button></div></form></Modal>;
 }
 
-function Explore({ venues }: { venues: Venue[] }) {
+function Explore({ venues, lang }: { venues: Venue[]; lang: Language }) {
   const [, setLocation] = useLocation();
+  const t = translations[lang];
   const [activeFilters, setActiveFilters] = useState<VenueType[]>([]);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Venue | null>(null);
-  useEffect(() => {
-    setSelected((current) => current && venues.some((venue) => venue.id === current.id) ? current : venues[0] ?? null);
-  }, [venues]);
+
   const filtered = useMemo(() => venues.filter((venue) => (!activeFilters.length || activeFilters.includes(venue.type)) && `${venue.name} ${venue.address}`.toLowerCase().includes(search.toLowerCase())), [activeFilters, search, venues]);
-  const filters = [{ key: 'all' as const, label: 'All spots', icon: Sparkles }, { key: 'bar' as const, label: 'Bars', icon: GlassWater }, { key: 'restaurant' as const, label: 'Restaurants', icon: Utensils }, { key: 'club' as const, label: 'Clubs', icon: Ticket }];
+  const filters = [{ key: 'all' as const, label: t.allSpots, icon: Sparkles }, { key: 'bar' as const, label: t.bars, icon: GlassWater }, { key: 'restaurant' as const, label: t.restaurants, icon: Utensils }, { key: 'club' as const, label: t.clubs, icon: Ticket }];
+
   return <main className="map-page">
     <MapContainer center={mapCenter} zoom={14} minZoom={11} maxZoom={18} zoomControl={false} className="map-canvas" scrollWheelZoom>
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      
+      <MapClickHandler onClick={() => setSelected(null)} />
+
       {filtered.map((venue) => <Marker key={venue.id} position={[venue.lat, venue.lng]} icon={venueIcon(venue, selected?.id === venue.id)} eventHandlers={{ click: () => setSelected(venue) }}>
         <Popup>
-          <div className="leaflet-popup-content-inner"><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> Portami qui</a></div>
+          <div className="leaflet-popup-content-inner"><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> {t.takeMeThere}</a></div>
         </Popup>
       </Marker>)}
       <ZoomControls />
-      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a place or address" aria-label="Search venues" data-testid="input-map-search" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label><div className="map-note"><LocateFixed size={15} /><span>Showing tonight in <strong>Teramo</strong></span></div></div>
-      <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])} data-testid={`button-filter-${key}`}><Icon size={13} /><span>{label}</span></button>; })}</div>
-      {!venues.length && <div className="map-empty"><strong>Nessun locale disponibile</strong><span>I locali Firestore appariranno qui in tempo reale.</span></div>}
+      <div className="map-topbar"><label className="map-search"><Search size={17} color="#2b7468" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label="Search venues" /><span className="eyebrow" style={{ fontSize: 9 }}>Teramo</span></label><div className="map-note"><LocateFixed size={15} /><span>{t.showingIn} <strong>Teramo</strong></span></div></div>
+      <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])}><Icon size={13} /><span>{label}</span></button>; })}</div>
+      {!venues.length && <div className="map-empty"><strong>{t.noVenues}</strong><span>{t.noVenuesSub}</span></div>}
     </MapContainer>
-    {selected && <section className="map-panel" data-testid={`card-venue-${selected.id}`}><div className="panel-image"><div className="panel-image-text">{selected.type}</div></div><div className="panel-body"><div className="eyebrow">{selected.type}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><MapPin size={12} /> {selected.address}</span><span className="meta-item"><Clock3 size={12} /> {selected.hours}</span></div><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)} data-testid="button-view-venue-events"><CalendarDays size={14} /> See events</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer" data-testid="button-directions"><Navigation size={14} /> Portami qui</a></div></div></section>}
+    
+    {selected && <section className="map-panel"><div className="panel-image"><div className="panel-image-text">{selected.type}</div></div><div className="panel-body"><div className="eyebrow">{selected.type}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><MapPin size={12} /> {selected.address}</span><span className="meta-item"><Clock3 size={12} /> {selected.hours}</span></div><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)}><CalendarDays size={14} /> {t.seeEvents}</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={14} /> {t.takeMeThere}</a></div></div></section>}
   </main>;
 }
 
-function EventsPage({ events, venues, onBook }: { events: CityEvent[]; venues: Venue[]; onBook: (venue: Venue, event?: CityEvent) => void }) {
+function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; venues: Venue[]; lang: Language; onBook: (venue: Venue, event?: CityEvent) => void }) {
+  const t = translations[lang];
   const [selectedDate, setSelectedDate] = useState('');
   const [eventDetail, setEventDetail] = useState<CityEvent | null>(null);
   const dates = useMemo(() => [...new Set(events.map((event) => event.date))].sort(), [events]);
+
   useEffect(() => {
     if (!dates.length) setSelectedDate('');
     else if (!dates.includes(selectedDate)) setSelectedDate(dates[0]);
   }, [dates, selectedDate]);
+
   const shown = events.filter((event) => event.date === selectedDate);
   const eventVenue = (event: CityEvent) => venues.find((venue) => venue.name.trim().toLowerCase() === event.venueName.trim().toLowerCase());
   const today = new Date().toISOString().slice(0, 10);
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">The city is on</span><h1 className="page-title">Plans with a pulse.</h1><p className="page-copy">Dated things worth leaving the house for, from first aperitivo to last dance.</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)} data-testid="button-today">Oggi</button><Link href="/" className="outline-button" data-testid="link-back-to-map"><MapPin size={14} /> Browse map</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)} data-testid={`button-date-${date}`}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>Nessun evento disponibile.</h2><p>Gli eventi Firestore appariranno qui in tempo reale.</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-event-${event.id}`}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)} data-testid={`button-event-details-${event.id}`}>Details</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>A quieter date.</h2><p>Nothing is listed for this day yet. Try another date.</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive editorial</span><h2>Do one thing properly tonight.</h2><p>Skip the endless scroll. Pick a room, a table or a dance floor that feels like a story already in progress.</p><div className="feature-stat"><div><strong>{venues.length}</strong><span>locali connessi</span></div><div><strong>{events.length}</strong><span>eventi disponibili</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details" data-testid="button-close-event"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }} data-testid={`button-book-event-${eventDetail.id}`}><Ticket size={14} /> Book this event</button> : <p className="page-copy">Il locale non è presente nella collezione venues.</p>}</div></Modal>}</main>;
+
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">CityLive</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive editorial</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><div className="feature-stat"><div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div><div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div></div></aside></div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
 }
 
-function BookingsPage({ bookings, venues, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Your CityLive</span><h1 className="page-title">Plans in motion.</h1><p className="page-copy">Your confirmed tables, rooms and reasons to get out.</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }} data-testid={`card-booking-${booking.id}`}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title="Cancella prenotazione" aria-label="Cancella prenotazione" style={{ color: '#d32f2f' }} data-testid={`button-delete-booking-${booking.id}`}><Trash2 size={16} /></button></div></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>A small nudge</span><h2>Leave room for a little spontaneity.</h2><p>Plans are better when they have somewhere to start. Find a new favorite room for the next one.</p><button className="primary-button" onClick={onExplore} data-testid="button-explore-more"><Compass size={14} /> Explore the city</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>No plans yet.</h2><p>Your next good night is probably one short walk away. Find a table, a drink or a dance floor.</p><button className="primary-button" onClick={onExplore} data-testid="button-empty-explore"><Compass size={14} /> Explore tonight</button></div></div>}</main>;
+function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; lang: Language; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
+  const t = translations[lang];
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">CityLive</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div><aside className="side-feature"><span className="eyebrow" style={{ color: '#e6a47d' }}>CityLive</span><h2>{t.editorialTitle}</h2><p>{t.editorialCopy}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></aside></div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>{t.noPlans}</h2><p>{t.noPlansSub}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></div></div>}</main>;
 }
 
-function RouterContent({ user, venues, events, onSignIn, onSignOut, bookings, onBooking, onDeleteBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; onSignIn: () => void; onSignOut: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void; onDeleteBooking: (bookingId: string) => void }) {
+function RouterContent({ user, venues, events, lang, onSignIn, onSignOut, onChangeLang, bookings, onBooking, onDeleteBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void; onDeleteBooking: (bookingId: string) => void }) {
   const [, setLocation] = useLocation();
-  return <AppShell user={user} eventsCount={events.length} onSignIn={onSignIn} onSignOut={onSignOut}><Switch><Route path="/"><Explore venues={venues} /></Route><Route path="/events"><EventsPage events={events} venues={venues} onBook={onBooking} /></Route><Route path="/bookings"><BookingsPage bookings={bookings} venues={venues} onExplore={() => setLocation('/')} onDeleteBooking={onDeleteBooking} /></Route><Route><div className="page"><div className="empty-state"><div><div className="empty-icon"><Compass size={24} /></div><h2>That street is a little lost.</h2><p>Let’s get you back to the map.</p><Link href="/" className="primary-button" data-testid="link-not-found-home">Back to explore</Link></div></div></div></Route></Switch></AppShell>;
+  return <AppShell user={user} eventsCount={events.length} lang={lang} onSignIn={onSignIn} onSignOut={onSignOut} onChangeLang={onChangeLang}><Switch><Route path="/"><Explore venues={venues} lang={lang} /></Route><Route path="/events"><EventsPage events={events} venues={venues} lang={lang} onBook={onBooking} /></Route><Route path="/bookings"><BookingsPage bookings={bookings} venues={venues} lang={lang} onExplore={() => setLocation('/')} onDeleteBooking={onDeleteBooking} /></Route><Route><div className="page"><div className="empty-state"><div><div className="empty-icon"><Compass size={24} /></div><h2>Page not found.</h2><Link href="/" className="primary-button">Back to explore</Link></div></div></div></Route></Switch></AppShell>;
 }
 
 function authUser(user: FirebaseUser): User {
@@ -277,6 +457,9 @@ function authUser(user: FirebaseUser): User {
 }
 
 function App() {
+  const [lang, setLang] = useState<Language | null>(() => {
+    return (localStorage.getItem('citylive_lang') as Language) || null;
+  });
   const [user, setUser] = useState<User | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [events, setEvents] = useState<CityEvent[]>([]);
@@ -287,6 +470,11 @@ function App() {
   const [pendingBooking, setPendingBooking] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [toast, setToast] = useState('');
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3200); };
+
+  const handleSelectLanguage = (selectedLang: Language) => {
+    setLang(selectedLang);
+    localStorage.setItem('citylive_lang', selectedLang);
+  };
 
   useEffect(() => onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser ? authUser(firebaseUser) : null)), []);
 
@@ -299,8 +487,26 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(firestore, 'events'), (snapshot) => {
-      setEvents(snapshot.docs.map(readEvent).filter((event): event is CityEvent => event !== null));
+    const unsubscribe = onSnapshot(collection(firestore, 'events'), async (snapshot) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const activeEvents: CityEvent[] = [];
+
+      for (const item of snapshot.docs) {
+        const parsed = readEvent(item);
+        if (parsed) {
+          if (parsed.date < today) {
+            try {
+              await deleteDoc(doc(firestore, 'events', item.id));
+            } catch (err) {
+              console.error('Errore durante l\'eliminazione dell\'evento scaduto:', err);
+            }
+          } else {
+            activeEvents.push(parsed);
+          }
+        }
+      }
+
+      setEvents(activeEvents);
       setCatalogErrors((current) => ({ ...current, events: '' }));
     }, () => setCatalogErrors((current) => ({ ...current, events: 'Impossibile leggere la collezione events.' })));
     return unsubscribe;
@@ -367,7 +573,7 @@ function App() {
       const created = await addDoc(collection(firestore, 'bookings'), cleanData);
       setBookings((current) => [{ ...booking, id: created.id }, ...current]);
       setBookingTarget(null);
-      showToast('Prenotazione confermata. Ci vediamo lì.');
+      showToast(translations[lang || 'it'].bookingConfirmed);
     } catch (err) {
       console.error('Errore Firestore:', err);
       showToast('Prenotazione non salvata. Controlla le regole Firestore e riprova.');
@@ -393,7 +599,12 @@ function App() {
   };
 
   const catalogError = [catalogErrors.venues, catalogErrors.events].filter(Boolean).join(' ');
-  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterContent user={user} venues={venues} events={events} onSignIn={() => setAuthOpen(true)} onSignOut={() => void logout()} bookings={bookings} onBooking={requestBooking} onDeleteBooking={(id) => void deleteBooking(id)} />{authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => void startGoogleSignIn()} />}{bookingTarget && <BookingModal venue={bookingTarget.venue} event={bookingTarget.event} onClose={() => setBookingTarget(null)} onBooked={(booking) => void booked(booking)} />}{catalogError && <div className="toast" role="alert" data-testid="status-catalog-error">{catalogError}</div>}{toast && <div className="toast" role="status" data-testid="status-toast">{toast}</div>}</WouterRouter>;
+
+  if (!lang) {
+    return <LanguageSelector onSelect={handleSelectLanguage} />;
+  }
+
+  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterContent user={user} venues={venues} events={events} lang={lang} onSignIn={() => setAuthOpen(true)} onSignOut={() => void logout()} onChangeLang={() => setLang(null)} bookings={bookings} onBooking={requestBooking} onDeleteBooking={(id) => void deleteBooking(id)} />{authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => void startGoogleSignIn()} />}{bookingTarget && <BookingModal venue={bookingTarget.venue} event={bookingTarget.event} lang={lang} onClose={() => setBookingTarget(null)} onBooked={(booking) => void booked(booking)} />}{catalogError && <div className="toast" role="alert">{catalogError}</div>}{toast && <div className="toast" role="status">{toast}</div>}</WouterRouter>;
 }
 
 export default App;
