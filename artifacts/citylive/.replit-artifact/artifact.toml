@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "CityLive Affluenza Locali"
+description = "Una web app urbana per scoprire dove c'è movimento in città, filtrare locali sulla mappa, vedere gli eventi e prenotare la partecipazione."
+version = "1.0.0"
+id = "artifacts/citylive"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25251
+
+[services.development]
+run = "pnpm --filter @workspace/citylive run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/citylive", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/citylive/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25251"
+BASE_PATH = "/"

@@ -1,0 +1,69 @@
+Crea un'applicazione web completa in React, Vite e Tailwind CSS con backend Firebase Firestore/Auth integrato. Il sito deve rispecchiare fedelmente l'interfaccia dell'applicazione "CityLive".
+
+CONFIGURAZIONE FIREBASE INTEGRATA
+
+Usa direttamente queste credenziali per configurare Firebase:
+
+apiKey: "AIzaSyA8KUSZtbCNObXbvptC5jv476U_-VV2zSc"
+
+authDomain: "spotly-6ae5c.firebaseapp.com"
+
+projectId: "spotly-6ae5c"
+
+storageBucket: "spotly-6ae5c.firebasestorage.app"
+
+messagingSenderId: "207269639614"
+
+appId: "1:207269639614:web:d28a05a80db8de40c675ef"
+
+CARATTERISTICHE E INTERFACCIA UTENTE
+
+1. Header di Navigazione:
+
+Logo "CityLive AFFLUENZA LOCALI" a sinistra.
+
+Tab centrale con "Mappa" ed "Eventi" (con badge numerico per gli eventi presenti).
+
+In alto a destra: Gestione Autenticazione con Google (opzionale fino alla prenotazione). Quando l'utente è loggato, mostra "Ciao, [Nome Cognome]" con un menu a tendina contenente "Le mie prenotazioni" e "Log out".
+
+2. Interfaccia "Mappa":
+
+Mappa interattiva a schermo intero (Leaflet / React-Leaflet).
+
+Card sovrapposta in alto a sinistra con titolo "Dove c'è movimento oggi?".
+
+Filtri interattivi in alto per categoria di locale:
+
+Bar: Pin verde a forma di tazzina da caffè.
+
+Ristoranti: Pin giallo a forma di pizza.
+
+Discoteche: Pin rosso a forma di sfera della discoteca/musica.
+
+Filtro interattivo: permette di selezionare Tutti, Solo Bar, Solo Ristoranti, Solo Discoteche o una combinazione.
+
+Popup al click sul Pin: Mostra Nome locale, Indirizzo, Orari di apertura e un pulsante "Portami qui" che apre le indicazioni geografiche esterne via Google Maps ([https://www.google.com/maps/dir/?api=1&destination=LAT,LNG](https://www.google.com/maps/dir/?api=1&destination=LAT,LNG)).
+
+3. Interfaccia "Eventi":
+
+Header della sezione: "Eventi in programma" con selettore data (Data picker e pulsante "Oggi").
+
+Elenco degli eventi per il giorno selezionato: locandina (immagine da database/storage), titolo evento, nome del locale e orario.
+
+Cliccando sul pulsante "Partecipa":
+
+Se l'utente NON è loggato: Apre il pop-up di login obbligatorio con Google Auth.
+
+Se l'utente è loggato: Apre una modal di registrazione che chiede Nome e Cognome e, solo se il locale è un ristorante, il campo obbligatorio "Orario di arrivo".
+
+Al salvataggio: Registra la prenotazione nella collezione bookings di Firestore.
+
+4. Sezione "Le mie prenotazioni":
+
+Accessibile dal menu utente in alto a destra.
+
+Mostra l'elenco delle prenotazioni effettuate dall'utente.
+
+Nasconde ed elimina automaticamente le prenotazioni antecedenti alla data odierna.
+
+Installa le dipendenze necessarie (firebase, leaflet, react-leaflet, lucide-react) e genera il codice completo e funzionante.
