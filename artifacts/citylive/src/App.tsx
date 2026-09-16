@@ -191,7 +191,19 @@ function BookingModal({ venue, event, onClose, onBooked }: { venue: Venue; event
   const [guests, setGuests] = useState('2 guests');
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onBooked({ id: `booking-${Date.now()}`, venueId: venue.id, venueName: venue.name, date, time, guests, status: 'confirmed', firstName, lastName, arrivalTime: venue.type === 'restaurant' ? time : undefined, eventTitle: event?.title });
+    onBooked({
+      id: `booking-${Date.now()}`,
+      venueId: venue.id,
+      venueName: venue.name,
+      date: date || new Date().toISOString().slice(0, 10),
+      time: time || '19:30',
+      guests: guests || '2 guests',
+      status: 'confirmed',
+      firstName: firstName || '',
+      lastName: lastName || '',
+      arrivalTime: venue.type === 'restaurant' ? (time || '') : '',
+      eventTitle: event?.title || ''
+    });
   };
   return <Modal onClose={onClose} label={`Book ${venue.name}`}><div className="modal-head"><div><span className="eyebrow">{event ? 'Reserve your spot' : 'Make a plan'}</span><h2>{event ? event.title : venue.name}</h2><p>{venue.address} · {event ? event.time : 'Choose your time'}</p></div><button className="icon-button" onClick={onClose} aria-label="Close booking form" data-testid="button-close-booking"><X size={17} /></button></div><form className="modal-body" onSubmit={submit}><hr className="modal-divider" /><div className="form-grid"><div className="field"><label htmlFor="booking-first-name">Nome</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required data-testid="input-booking-first-name" /></div><div className="field"><label htmlFor="booking-last-name">Cognome</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required data-testid="input-booking-last-name" /></div><div className="field"><label htmlFor="booking-date">Date</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required data-testid="input-booking-date" /></div><div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? 'Orario di arrivo' : 'Time'}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required data-testid="select-booking-time" /></div><div className="field full"><label htmlFor="booking-guests">Party size</label><select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}><option>1 guest</option><option>2 guests</option><option>3 guests</option><option>4 guests</option><option>5 guests</option><option>6 guests</option></select></div></div><div className="form-actions"><button type="button" className="outline-button" onClick={onClose} data-testid="button-cancel-booking">Not tonight</button><button type="submit" className="primary-button" data-testid="button-confirm-booking"><Check size={15} /> Confirm booking</button></div></form></Modal>;
 }
@@ -323,12 +335,28 @@ function App() {
   const booked = async (booking: Booking) => {
     if (!user) return;
     try {
-      const data = { ...booking, userId: user.uid, createdAt: serverTimestamp() };
-      const created = await addDoc(collection(firestore, 'bookings'), data);
+      // Pulizia dei dati da salvare su Firestore per evitare valori undefined
+      const cleanData = {
+        userId: user.uid,
+        venueId: booking.venueId || '',
+        venueName: booking.venueName || '',
+        date: booking.date || '',
+        time: booking.time || '',
+        guests: booking.guests || '',
+        status: 'confirmed',
+        firstName: booking.firstName || '',
+        lastName: booking.lastName || '',
+        arrivalTime: booking.arrivalTime || '',
+        eventTitle: booking.eventTitle || '',
+        createdAt: serverTimestamp()
+      };
+      
+      const created = await addDoc(collection(firestore, 'bookings'), cleanData);
       setBookings((current) => [{ ...booking, id: created.id }, ...current]);
       setBookingTarget(null);
       showToast('Prenotazione confermata. Ci vediamo lì.');
-    } catch {
+    } catch (err) {
+      console.error('Errore Firestore:', err);
       showToast('Prenotazione non salvata. Controlla le regole Firestore e riprova.');
     }
   };
