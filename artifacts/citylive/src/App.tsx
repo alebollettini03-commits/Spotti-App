@@ -331,7 +331,23 @@ function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onCh
 
   return <div className="app-shell">
     <header className="app-nav">
-      <Link href="/" className="brand"><span className="brand-mark"><Navigation size={17} /></span><span className="brand-name">Spotti</span></Link>
+      <Link href="/" className="brand">
+        <span className="brand-mark">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#991b1b" /* Rosso scuro */
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6 C18 6, 6 4, 6 9 C6 14, 18 10, 18 15 C18 20, 6 18, 6 18" />
+          </svg>
+        </span>
+        <span className="brand-name">Spotti</span>
+      </Link>
       <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`}><Icon size={14} /> {label}{href === '/events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <button className="icon-button" onClick={onChangeLang} title="Cambia lingua / Change language">
@@ -548,102 +564,39 @@ export default function App() {
     const loadBookings = async () => {
       try {
         const snapshot = await getDocs(query(collection(firestore, 'bookings'), where('userId', '==', user.uid)));
-        const today = new Date().toISOString().slice(0, 10);
-        const active: Booking[] = [];
-        await Promise.all(snapshot.docs.map(async (item) => {
-          const data = item.data() as Omit<Booking, 'id'>;
-          if (data.date && data.date < today) await deleteDoc(doc(firestore, 'bookings', item.id));
-          else active.push({ id: item.id, ...data });
-        }));
-        if (!cancelled) setBookings(active);
+        const activeBookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        if (!cancelled) setBookings(activeBookings);
       } catch (err) {
-        console.error('Errore durante il caricamento delle prenotazioni:', err);
+        console.error('Errore caricamento prenotazioni:', err);
       }
     };
     loadBookings();
     return () => { cancelled = true; };
   }, [user]);
 
-  const handleSignIn = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      setAuthOpen(false);
-      if (pendingBooking) {
-        setBookingTarget(pendingBooking);
-        setPendingBooking(null);
-      }
-    } catch (err) {
-      console.error('Errore di autenticazione:', err);
-    }
-  };
-
-  const handleSignOut = () => {
-    signOut(auth);
-  };
-
-  const handleCreateBooking = async (booking: Booking) => {
-    if (!user) return;
-    try {
-      const docRef = await addDoc(collection(firestore, 'bookings'), {
-        ...booking,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      setBookings((prev) => [...prev, { ...booking, id: docRef.id }]);
-      setBookingTarget(null);
-      showToast(translations[lang || 'it'].bookingConfirmed);
-    } catch (err) {
-      console.error('Errore durante il salvataggio della prenotazione:', err);
-    }
-  };
-
-  const handleDeleteBooking = async (bookingId: string) => {
-    try {
-      await deleteDoc(doc(firestore, 'bookings', bookingId));
-      setBookings((prev) => prev.filter((item) => item.id !== bookingId));
-    } catch (err) {
-      console.error('Errore durante la cancellazione della prenotazione:', err);
-    }
-  };
-
-  const handleStartBooking = (venue: Venue, event?: CityEvent) => {
-    if (!user) {
-      setPendingBooking({ venue, event });
-      setAuthOpen(true);
-    } else {
-      setBookingTarget({ venue, event });
-    }
-  };
-
   if (!lang) {
     return <LanguageSelector onSelect={handleSelectLanguage} />;
   }
 
   return (
-    <>
-      <RouterContent
-        user={user}
-        venues={venues}
-        events={events}
-        lang={lang}
-        onSignIn={() => setAuthOpen(true)}
-        onSignOut={handleSignOut}
-        onChangeLang={() => setLang(null)}
-        bookings={bookings}
-        onBooking={handleStartBooking}
-        onDeleteBooking={handleDeleteBooking}
-      />
-      {authOpen && <SignInModal onClose={() => setAuthOpen(false)} onSignIn={handleSignIn} />}
-      {bookingTarget && (
-        <BookingModal
-          venue={bookingTarget.venue}
-          event={bookingTarget.event}
-          lang={lang}
-          onClose={() => setBookingTarget(null)}
-          onBooked={handleCreateBooking}
-        />
-      )}
-      {toast && <div className="toast">{toast}</div>}
-    </>
+    <RouterContent
+      user={user}
+      venues={venues}
+      events={events}
+      lang={lang}
+      onSignIn={() => setAuthOpen(true)}
+      onSignOut={() => signOut(auth)}
+      onChangeLang={() => setLang(null)}
+      bookings={bookings}
+      onBooking={(venue, event) => setBookingTarget({ venue, event })}
+      onDeleteBooking={async (id) => {
+        try {
+          await deleteDoc(doc(firestore, 'bookings', id));
+          setBookings((prev) => prev.filter((b) => b.id !== id));
+        } catch (err) {
+          console.error('Errore durante la cancellazione:', err);
+        }
+      }}
+    />
   );
 }
