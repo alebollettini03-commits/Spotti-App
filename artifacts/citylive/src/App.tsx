@@ -522,6 +522,45 @@ export default function App() {
     localStorage.setItem('spotti_lang', selectedLang);
   };
 
+  const handleSignIn = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      setUser(authUser(result.user));
+      setAuthOpen(false);
+      if (pendingBooking) {
+        setBookingTarget(pendingBooking);
+        setPendingBooking(null);
+      }
+    } catch (err) {
+      console.error('Errore durante l\'autenticazione:', err);
+    }
+  };
+
+  const handleCreateBooking = async (booking: Booking) => {
+    if (!user) return;
+    try {
+      const docRef = await addDoc(collection(firestore, 'bookings'), {
+        ...booking,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      setBookings((prev) => [...prev, { ...booking, id: docRef.id }]);
+      setBookingTarget(null);
+      showToast(translations[lang || 'it'].bookingConfirmed);
+    } catch (err) {
+      console.error('Errore durante il salvataggio della prenotazione:', err);
+    }
+  };
+
+  const handleStartBooking = (venue: Venue, event?: CityEvent) => {
+    if (!user) {
+      setPendingBooking({ venue, event });
+      setAuthOpen(true);
+      return;
+    }
+    setBookingTarget({ venue, event });
+  };
+
   useEffect(() => onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser ? authUser(firebaseUser) : null)), []);
 
   useEffect(() => {
@@ -579,24 +618,52 @@ export default function App() {
   }
 
   return (
-    <RouterContent
-      user={user}
-      venues={venues}
-      events={events}
-      lang={lang}
-      onSignIn={() => setAuthOpen(true)}
-      onSignOut={() => signOut(auth)}
-      onChangeLang={() => setLang(null)}
-      bookings={bookings}
-      onBooking={(venue, event) => setBookingTarget({ venue, event })}
-      onDeleteBooking={async (id) => {
-        try {
-          await deleteDoc(doc(firestore, 'bookings', id));
-          setBookings((prev) => prev.filter((b) => b.id !== id));
-        } catch (err) {
-          console.error('Errore durante la cancellazione:', err);
-        }
-      }}
-    />
+    <>
+      <RouterContent
+        user={user}
+        venues={venues}
+        events={events}
+        lang={lang}
+        onSignIn={() => setAuthOpen(true)}
+        onSignOut={() => signOut(auth)}
+        onChangeLang={() => setLang(null)}
+        bookings={bookings}
+        onBooking={handleStartBooking}
+        onDeleteBooking={async (id) => {
+          try {
+            await deleteDoc(doc(firestore, 'bookings', id));
+            setBookings((prev) => prev.filter((b) => b.id !== id));
+          } catch (err) {
+            console.error('Errore durante la cancellazione:', err);
+          }
+        }}
+      />
+
+      {/* MODALE DI AUTENTICAZIONE GOOGLE */}
+      {authOpen && (
+        <SignInModal
+          onClose={() => setAuthOpen(false)}
+          onSignIn={handleSignIn}
+        />
+      )}
+
+      {/* MODALE DI PRENOTAZIONE */}
+      {bookingTarget && (
+        <BookingModal
+          venue={bookingTarget.venue}
+          event={bookingTarget.event}
+          lang={lang}
+          onClose={() => setBookingTarget(null)}
+          onBooked={handleCreateBooking}
+        />
+      )}
+
+      {/* TOAST NOTIFICA PRENOTAZIONE */}
+      {toast && (
+        <div className="toast" style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#2b7468', color: '#fff', padding: '12px 20px', borderRadius: '8px', zIndex: 10000, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+          {toast}
+        </div>
+      )}
+    </>
   );
 }
