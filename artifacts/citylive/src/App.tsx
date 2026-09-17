@@ -528,23 +528,37 @@ export default function App() {
   };
 
   const handleCreateBooking = async (booking: Booking) => {
-    if (!user) return;
+    if (!user) {
+      showToast('Devi effettuare l\'accesso per prenotare');
+      return;
+    }
 
-    // 1. Aggiorna subito lo stato locale e chiudi la modale
-    setBookings((prev) => [...prev, booking]);
-    setBookingTarget(null);
-    showToast(translations[lang || 'it'].bookingConfirmed);
-
-    // 2. Salva in background su Firestore senza bloccare l'interfaccia
     try {
-      const { id, ...bookingData } = booking;
-      await addDoc(collection(firestore, 'bookings'), {
-        ...bookingData,
+      // Chiude la modale e avvisa l'utente
+      setBookingTarget(null);
+
+      // Prepara l'oggetto senza campi undefined (Firestore rifiuta i valori undefined)
+      const bookingData = {
+        venueId: booking.venueId || '',
+        venueName: booking.venueName || '',
+        date: booking.date || '',
+        time: booking.time || '',
+        guests: booking.guests || '',
+        status: 'confirmed',
+        firstName: booking.firstName || '',
+        lastName: booking.lastName || '',
+        arrivalTime: booking.arrivalTime || '',
+        eventTitle: booking.eventTitle || '',
         userId: user.uid,
         createdAt: serverTimestamp(),
-      });
+      };
+
+      // Salva nel database Firestore
+      await addDoc(collection(firestore, 'bookings'), bookingData);
+      showToast(translations[lang || 'it'].bookingConfirmed);
     } catch (err) {
       console.error('Errore durante il salvataggio su Firestore:', err);
+      showToast('Errore nel salvataggio della prenotazione.');
     }
   };
 
@@ -610,30 +624,29 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // Ascolto IN TEMPO REALE delle prenotazioni dell'utente autenticato
   useEffect(() => {
     if (!user) {
       setBookings([]);
       return;
     }
-    let cancelled = false;
-    const loadBookings = async () => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(firestore, 'bookings'), where('userId', '==', user.uid))
-        );
+
+    const q = query(collection(firestore, 'bookings'), where('userId', '==', user.uid));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const activeBookings = snapshot.docs.map((docSnap) => ({
           id: docSnap.id,
           ...docSnap.data(),
         } as Booking));
-        if (!cancelled) setBookings(activeBookings);
-      } catch (err) {
-        console.error('Errore caricamento prenotazioni:', err);
+        setBookings(activeBookings);
+      },
+      (err) => {
+        console.error('Errore caricamento prenotazioni Firestore:', err);
       }
-    };
-    loadBookings();
-    return () => {
-      cancelled = true;
-    };
+    );
+
+    return () => unsubscribe();
   }, [user]);
 
   if (!lang) {
