@@ -331,23 +331,23 @@ function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onCh
 
   return <div className="app-shell">
     <header className="app-nav">
-      <Link href="/" className="brand">
-        <span className="brand-mark">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#991b1b" /* Rosso scuro */
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M18 6 C18 6, 6 4, 6 9 C6 14, 18 10, 18 15 C18 20, 6 18, 6 18" />
-          </svg>
-        </span>
-        <span className="brand-name">Spotti</span>
-      </Link>
+    <Link href="/" className="brand">
+  <span className="brand-mark" style={{ backgroundColor: '#991b1b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', padding: '6px' }}>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff" /* Bianco per la S */
+      strokeWidth="3.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 C18 6, 6 4, 6 9 C6 14, 18 10, 18 15 C18 20, 6 18, 6 18" />
+    </svg>
+  </span>
+  <span className="brand-name">Spotti</span>
+</Link>
       <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`}><Icon size={14} /> {label}{href === '/events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <button className="icon-button" onClick={onChangeLang} title="Cambia lingua / Change language">
