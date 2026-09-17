@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import {
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -522,19 +522,13 @@ export default function App() {
     localStorage.setItem('spotti_lang', selectedLang);
   };
 
-  const handleSignIn = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      setUser(authUser(result.user));
-      setAuthOpen(false);
-      if (pendingBooking) {
-        setBookingTarget(pendingBooking);
-        setPendingBooking(null);
-      }
-    } catch (err) {
-      console.error('Errore durante l\'autenticazione:', err);
-    }
-  };
+ const handleSignIn = async () => {
+  try {
+    await signInWithRedirect(auth, googleProvider);
+  } catch (err) {
+    console.error('Errore durante l\'autenticazione:', err);
+  }
+};
 
   const handleCreateBooking = async (booking: Booking) => {
     if (!user) return;
