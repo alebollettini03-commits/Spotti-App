@@ -234,12 +234,12 @@
   .user-button { padding-right: 8px; }
   .user-button span { display: none; }
   .user-menu { right: -3px; }
-  .heading-actions { margin-top: 17px; }
+  .heading-actions { display: flex; align-items: center; gap: 8px; margin-top: 0; }
   .page { width: min(100% - 32px, 620px); padding-top: 24px; }
-  .page-heading { display: block; }
+  .page-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
   .page-heading .outline-button { margin-top: 17px; }
   .content-grid, .booking-grid { grid-template-columns: 1fr; }
-  .side-feature { position: static; order: -1; max-width: 100%; margin-bottom: 16px; }
+  .side-feature { position: static; order: 1; max-width: 100%; margin-top: 20px; }
   .map-page, .map-canvas { min-height: calc(100dvh - 66px); }
   .map-topbar { top: 14px; left: 14px; right: 14px; }
   .map-note { display: none; }
