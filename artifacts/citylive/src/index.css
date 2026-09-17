@@ -299,3 +299,21 @@
   .map-canvas .map-topbar { top: 14px; }
   .map-canvas .filter-rail { top: 78px; }
 }
+@media (max-width: 800px) {
+  .heading-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  .heading-actions > * {
+    height: 38px !important;
+    padding: 0 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+}
