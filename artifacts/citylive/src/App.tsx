@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import {
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -49,8 +49,8 @@ import { firestore, auth, googleProvider } from './lib/firebase';
 import L from 'leaflet';
 
 type Language = 'it' | 'en';
-
 type VenueType = 'bar' | 'restaurant' | 'club';
+
 type Venue = {
   id: string;
   name: string;
@@ -60,6 +60,7 @@ type Venue = {
   lng: number;
   type: VenueType;
 };
+
 type CityEvent = {
   id: string;
   title: string;
@@ -69,6 +70,7 @@ type CityEvent = {
   type: string;
   posterUrl?: string;
 };
+
 type Booking = {
   id: string;
   venueId: string;
@@ -82,6 +84,7 @@ type Booking = {
   arrivalTime?: string;
   eventTitle?: string;
 };
+
 type User = { uid: string; name: string; email: string; photoURL?: string | null };
 
 const mapCenter: [number, number] = [42.6589, 13.7039];
@@ -111,7 +114,7 @@ const translations = {
     noEvents: 'Nessun evento disponibile.',
     noEventsSub: 'Gli eventi appariranno qui in tempo reale.',
     quieterDate: 'Nessun evento.',
-    quieterDateSub: 'Non c\'è nulla in programma per questa data.',
+    quieterDateSub: "Non c'è nulla in programma per questa data.",
     details: 'Dettagli',
     editorialTitle: 'Vivi la serata giusta.',
     editorialCopy: 'Scegli il tavolo o la pista da ballo perfetta per la tua serata.',
@@ -142,7 +145,7 @@ const translations = {
     partySize: 'Numero di persone',
     notTonight: 'Annulla',
     confirmBooking: 'Conferma prenotazione',
-    invalidTime: 'Orario non valido. L\'evento inizia alle',
+    invalidTime: "Orario non valido. L'evento inizia alle",
     invalidTimeSub: 'e non sono accettate prenotazioni precedenti.',
   },
   en: {
@@ -202,7 +205,7 @@ const translations = {
     confirmBooking: 'Confirm booking',
     invalidTime: 'Invalid time. The event starts at',
     invalidTimeSub: 'and earlier bookings are not allowed.',
-  }
+  },
 };
 
 function isVenueType(value: unknown): value is VenueType {
@@ -331,23 +334,23 @@ function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onCh
 
   return <div className="app-shell">
     <header className="app-nav">
-    <Link href="/" className="brand">
-  <span className="brand-mark" style={{ backgroundColor: '#991b1b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', padding: '6px' }}>
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#ffffff" /* Bianco per la S */
-      strokeWidth="3.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 C18 6, 6 4, 6 9 C6 14, 18 10, 18 15 C18 20, 6 18, 6 18" />
-    </svg>
-  </span>
-  <span className="brand-name">Spotti</span>
-</Link>
+      <Link href="/" className="brand">
+        <span className="brand-mark" style={{ backgroundColor: '#991b1b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', padding: '6px' }}>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6 C18 6, 6 4, 6 9 C6 14, 18 10, 18 15 C18 20, 6 18, 6 18" />
+          </svg>
+        </span>
+        <span className="brand-name">Spotti</span>
+      </Link>
       <nav className="nav-links" aria-label="Main navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href ? 'active' : ''}`}><Icon size={14} /> {label}{href === '/events' && <span className="nav-count">{eventsCount}</span>}</Link>)}</nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <button className="icon-button" onClick={onChangeLang} title="Cambia lingua / Change language">
@@ -424,9 +427,7 @@ function Explore({ venues, lang }: { venues: Venue[]; lang: Language }) {
   return <main className="map-page">
     <MapContainer center={mapCenter} zoom={14} minZoom={11} maxZoom={18} zoomControl={false} className="map-canvas" scrollWheelZoom>
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      
       <MapClickHandler onClick={() => setSelected(null)} />
-
       {filtered.map((venue) => <Marker key={venue.id} position={[venue.lat, venue.lng]} icon={venueIcon(venue, selected?.id === venue.id)} eventHandlers={{ click: () => setSelected(venue) }}>
         <Popup>
           <div className="leaflet-popup-content-inner"><strong>{venue.name}</strong><span>{venue.address}</span><span>{venue.hours}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer"><Navigation size={13} /> {t.takeMeThere}</a></div>
@@ -440,7 +441,6 @@ function Explore({ venues, lang }: { venues: Venue[]; lang: Language }) {
       <div className="filter-rail">{filters.map(({ key, label, icon: Icon }) => { const active = key === 'all' ? !activeFilters.length : activeFilters.includes(key); return <button key={key} className={`filter-chip ${active ? 'active' : ''}`} onClick={() => key === 'all' ? setActiveFilters([]) : setActiveFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])}><Icon size={13} /><span>{label}</span></button>; })}</div>
       {!venues.length && <div className="map-empty"><strong>{t.noVenues}</strong><span>{t.noVenuesSub}</span></div>}
     </MapContainer>
-    
     {selected && <section className="map-panel"><div className="panel-image"><div className="panel-image-text">{selected.type}</div></div><div className="panel-body"><div className="eyebrow">{selected.type}</div><h2>{selected.name}</h2><div className="panel-meta"><span className="meta-item"><MapPin size={12} /> {selected.address}</span><span className="meta-item"><Clock3 size={12} /> {selected.hours}</span></div><div className="panel-actions"><button className="outline-button" onClick={() => setLocation(`/events?venue=${selected.id}`)}><CalendarDays size={14} /> {t.seeEvents}</button><a className="primary-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={14} /> {t.takeMeThere}</a></div></div></section>}
   </main>;
 }
@@ -460,32 +460,28 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
   const eventVenue = (event: CityEvent) => venues.find((venue) => venue.name.trim().toLowerCase() === event.venueName.trim().toLowerCase());
   const today = new Date().toISOString().slice(0, 10);
 
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} · {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div>
-  
-  <aside className="side-feature">
-    <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti editorial</span>
-    <h2>{t.editorialTitle}</h2>
-    <p>{t.editorialCopy}</p>
-    <div className="feature-stat">
-      <div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div>
-      <div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div>
-    </div>
-  </aside>
-  
-  </div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} · {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} · {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansWithPulse}</h1><p className="page-copy">{t.datedThings}</p></div><div className="heading-actions"><button className="soft-button" onClick={() => setSelectedDate(today)}>{t.today}</button><Link href="/" className="outline-button"><MapPin size={14} /> {t.browseMap}</Link></div></div>{dates.length ? <div className="date-strip">{dates.map((date) => { const parts = formatEventDate(date, lang); return <button key={date} className={`date-button ${selectedDate === date ? 'active' : ''}`} onClick={() => setSelectedDate(date)}><strong>{parts.day}</strong><span>{parts.weekday} {parts.month}</span></button>; })}</div> : <div className="empty-state compact-empty"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.noEvents}</h2><p>{t.noEventsSub}</p></div></div>}<div className="content-grid"><div className="event-list">{shown.length ? shown.map((event, index) => { const venue = eventVenue(event); const parts = formatEventDate(event.date, lang); return <article className="event-card" key={event.id} style={{ animationDelay: `${index * 70}ms` }}><div className={`event-poster ${event.posterUrl ? '' : 'event-poster-empty'}`} style={event.posterUrl ? { backgroundImage: `url(${event.posterUrl})` } : undefined}><span>{event.type}</span></div><div className="event-date"><strong>{parts.day}</strong><span>{parts.month}</span></div><div><span className="event-tag"><Sparkles size={10} /> {event.type}</span><h3>{event.title}</h3><p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p></div><button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button></article>; }) : <div className="empty-state"><div><div className="empty-icon"><CalendarDays size={24} /></div><h2>{t.quieterDate}</h2><p>{t.quieterDateSub}</p></div></div>}</div>
+    <aside className="side-feature">
+      <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti editorial</span>
+      <h2>{t.editorialTitle}</h2>
+      <p>{t.editorialCopy}</p>
+      <div className="feature-stat">
+        <div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div>
+        <div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div>
+      </div>
+    </aside>
+  </div>{eventDetail && <Modal onClose={() => setEventDetail(null)} label={`Event details for ${eventDetail.title}`}><div className="modal-head"><div><span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} {eventDetail.date}</span><h2>{eventDetail.title}</h2><p>{eventDetail.venueName} {eventDetail.time}</p></div><button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button></div><div className="modal-body"><hr className="modal-divider" /><div className="panel-meta" style={{ marginBottom: 18 }}><span className="meta-item"><MapPin size={13} /> {eventVenue(eventDetail)?.address ?? eventDetail.venueName}</span><span className="meta-item"><Clock3 size={13} /> {eventDetail.time}</span></div>{eventVenue(eventDetail) ? <button className="primary-button" onClick={() => { const venue = eventVenue(eventDetail); if (venue) { setEventDetail(null); onBook(venue, eventDetail); } }}><Ticket size={14} /> {t.bookThisEvent}</button> : <p className="page-copy">{t.notInVenues}</p>}</div></Modal>}</main>;
 }
 
 function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; lang: Language; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
   const t = translations[lang];
-  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', items: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div>
-  
-  <aside className="side-feature">
-    <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti</span>
-    <h2>{t.bookingEditorialTitle}</h2>
-    <p>{t.bookingEditorialCopy}</p>
-    <button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button>
-  </aside>
-  
+  return <main className="page"><div className="page-heading"><div><span className="eyebrow">Spotti</span><h1 className="page-title">{t.plansInMotion}</h1><p className="page-copy">{t.plansInMotionCopy}</p></div></div>{bookings.length ? <div className="booking-grid"><div>{bookings.map((booking, index) => { const venue = venues.find((item) => item.id === booking.venueId); const venueName = venue?.name ?? booking.venueName ?? 'Locale'; const venueType = venue?.type; return <article className="booking-card" key={booking.id} style={{ animationDelay: `${index * 70}ms` }}><div className="booking-badge">{venueType === 'restaurant' ? <Utensils size={22} /> : venueType === 'club' ? <Ticket size={22} /> : <GlassWater size={22} />}</div><div><span className="eyebrow">{venueType ?? 'booking'}</span><h3>{venueName}</h3><p>{booking.date} · {booking.time}<br />{booking.guests}{venue?.address ? ` · ${venue.address}` : ''}{booking.eventTitle ? <><br />{booking.eventTitle}</> : null}</p></div><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span className="status-tag"><Check size={10} /> {booking.status}</span><button className="icon-button" onClick={() => onDeleteBooking(booking.id)} title={t.cancelBooking} aria-label={t.cancelBooking} style={{ color: '#d32f2f' }}><Trash2 size={16} /></button></div></article>; })}</div>
+    <aside className="side-feature">
+      <span className="eyebrow" style={{ color: '#e6a47d' }}>Spotti</span>
+      <h2>{t.bookingEditorialTitle}</h2>
+      <p>{t.bookingEditorialCopy}</p>
+      <button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button>
+    </aside>
   </div> : <div className="empty-state"><div><div className="empty-icon"><Ticket size={24} /></div><h2>{t.noPlans}</h2><p>{t.noPlansSub}</p><button className="primary-button" onClick={onExplore}><Compass size={14} /> {t.exploreTonight}</button></div></div>}</main>;
 }
 
@@ -506,15 +502,15 @@ export default function App() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [events, setEvents] = useState<CityEvent[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [catalogErrors, setCatalogErrors] = useState({ venues: '', events: '' });
+  const [, setCatalogErrors] = useState({ venues: '', events: '' });
   const [authOpen, setAuthOpen] = useState(false);
   const [bookingTarget, setBookingTarget] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [pendingBooking, setPendingBooking] = useState<{ venue: Venue; event?: CityEvent } | null>(null);
   const [toast, setToast] = useState('');
 
-  const showToast = (message: string) => { 
-    setToast(message); 
-    window.setTimeout(() => setToast(''), 3200); 
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(''), 3200);
   };
 
   const handleSelectLanguage = (selectedLang: Language) => {
@@ -522,13 +518,14 @@ export default function App() {
     localStorage.setItem('spotti_lang', selectedLang);
   };
 
- const handleSignIn = async () => {
-  try {
-    await signInWithRedirect(auth, googleProvider);
-  } catch (err) {
-    console.error('Errore durante l\'autenticazione:', err);
-  }
-};
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      setAuthOpen(false);
+    } catch (err) {
+      console.error('Errore durante l\'autenticazione:', err);
+    }
+  };
 
   const handleCreateBooking = async (booking: Booking) => {
     if (!user) return;
@@ -555,56 +552,83 @@ export default function App() {
     setBookingTarget({ venue, event });
   };
 
-  useEffect(() => onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser ? authUser(firebaseUser) : null)), []);
+  useEffect(() => {
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser ? authUser(firebaseUser) : null);
+    });
+  }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(firestore, 'venues'), (snapshot) => {
-      setVenues(snapshot.docs.map(readVenue).filter((venue): venue is Venue => venue !== null));
-      setCatalogErrors((current) => ({ ...current, venues: '' }));
-    }, () => setCatalogErrors((current) => ({ ...current, venues: 'Impossibile leggere la collezione venues.' })));
+    if (user && pendingBooking) {
+      setBookingTarget(pendingBooking);
+      setPendingBooking(null);
+    }
+  }, [user, pendingBooking]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(firestore, 'venues'),
+      (snapshot) => {
+        setVenues(snapshot.docs.map(readVenue).filter((venue): venue is Venue => venue !== null));
+        setCatalogErrors((current) => ({ ...current, venues: '' }));
+      },
+      () => setCatalogErrors((current) => ({ ...current, venues: 'Impossibile leggere la collezione venues.' }))
+    );
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(firestore, 'events'), async (snapshot) => {
-      const today = new Date().toISOString().slice(0, 10);
-      const activeEvents: CityEvent[] = [];
-
-      for (const item of snapshot.docs) {
-        const parsed = readEvent(item);
-        if (parsed) {
-          if (parsed.date < today) {
-            try {
-              await deleteDoc(doc(firestore, 'events', item.id));
-            } catch (err) {
-              console.error('Errore durante l\'eliminazione dell\'evento scaduto:', err);
+    const unsubscribe = onSnapshot(
+      collection(firestore, 'events'),
+      async (snapshot) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const activeEvents: CityEvent[] = [];
+        for (const item of snapshot.docs) {
+          const parsed = readEvent(item);
+          if (parsed) {
+            if (parsed.date < today) {
+              try {
+                await deleteDoc(doc(firestore, 'events', item.id));
+              } catch (err) {
+                console.error('Errore durante l\'eliminazione dell\'evento scaduto:', err);
+              }
+            } else {
+              activeEvents.push(parsed);
             }
-          } else {
-            activeEvents.push(parsed);
           }
         }
-      }
-
-      setEvents(activeEvents);
-      setCatalogErrors((current) => ({ ...current, events: '' }));
-    }, () => setCatalogErrors((current) => ({ ...current, events: 'Impossibile leggere la collezione events.' })));
+        setEvents(activeEvents);
+        setCatalogErrors((current) => ({ ...current, events: '' }));
+      },
+      () => setCatalogErrors((current) => ({ ...current, events: 'Impossibile leggere la collezione events.' }))
+    );
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!user) { setBookings([]); return; }
+    if (!user) {
+      setBookings([]);
+      return;
+    }
     let cancelled = false;
     const loadBookings = async () => {
       try {
-        const snapshot = await getDocs(query(collection(firestore, 'bookings'), where('userId', '==', user.uid)));
-        const activeBookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        const snapshot = await getDocs(
+          query(collection(firestore, 'bookings'), where('userId', '==', user.uid))
+        );
+        const activeBookings = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        } as Booking));
         if (!cancelled) setBookings(activeBookings);
       } catch (err) {
         console.error('Errore caricamento prenotazioni:', err);
       }
     };
     loadBookings();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   if (!lang) {
@@ -612,7 +636,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <WouterRouter>
       <RouterContent
         user={user}
         venues={venues}
@@ -633,7 +657,6 @@ export default function App() {
         }}
       />
 
-      {/* MODALE DI AUTENTICAZIONE GOOGLE */}
       {authOpen && (
         <SignInModal
           onClose={() => setAuthOpen(false)}
@@ -641,7 +664,6 @@ export default function App() {
         />
       )}
 
-      {/* MODALE DI PRENOTAZIONE */}
       {bookingTarget && (
         <BookingModal
           venue={bookingTarget.venue}
@@ -652,12 +674,24 @@ export default function App() {
         />
       )}
 
-      {/* TOAST NOTIFICA PRENOTAZIONE */}
       {toast && (
-        <div className="toast" style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#2b7468', color: '#fff', padding: '12px 20px', borderRadius: '8px', zIndex: 10000, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+        <div
+          className="toast"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: '#2b7468',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            zIndex: 10000,
+            color: '#fff',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          }}
+        >
           {toast}
         </div>
       )}
-    </>
+    </WouterRouter>
   );
 }
