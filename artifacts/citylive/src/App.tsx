@@ -529,17 +529,22 @@ export default function App() {
 
   const handleCreateBooking = async (booking: Booking) => {
     if (!user) return;
+
+    // 1. Aggiorna subito lo stato locale e chiudi la modale
+    setBookings((prev) => [...prev, booking]);
+    setBookingTarget(null);
+    showToast(translations[lang || 'it'].bookingConfirmed);
+
+    // 2. Salva in background su Firestore senza bloccare l'interfaccia
     try {
-      const docRef = await addDoc(collection(firestore, 'bookings'), {
-        ...booking,
+      const { id, ...bookingData } = booking;
+      await addDoc(collection(firestore, 'bookings'), {
+        ...bookingData,
         userId: user.uid,
         createdAt: serverTimestamp(),
       });
-      setBookings((prev) => [...prev, { ...booking, id: docRef.id }]);
-      setBookingTarget(null);
-      showToast(translations[lang || 'it'].bookingConfirmed);
     } catch (err) {
-      console.error('Errore durante il salvataggio della prenotazione:', err);
+      console.error('Errore durante il salvataggio su Firestore:', err);
     }
   };
 
