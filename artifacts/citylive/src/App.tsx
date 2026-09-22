@@ -12,8 +12,7 @@ import {
 } from 'firebase/firestore';
 import {
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -916,10 +915,13 @@ export default function App() {
     localStorage.setItem('spotti_lang', selectedLang);
   };
 
-  const handleSignIn = async () => {
+ const handleSignIn = async () => {
     try {
       setAuthOpen(false);
-      await signInWithRedirect(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        setUser(authUser(result.user));
+      }
     } catch (err) {
       console.error("Errore durante l'autenticazione:", err);
     }
@@ -995,17 +997,7 @@ export default function App() {
   };
 
   // Gestione del rientro dal Login Google
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          setUser(authUser(result.user));
-        }
-      })
-      .catch((err) => {
-        console.error("Errore recupero redirect:", err);
-      });
-
+ useEffect(() => {
     return onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser ? authUser(firebaseUser) : null);
     });
