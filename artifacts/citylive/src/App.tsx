@@ -51,7 +51,7 @@ import L from 'leaflet';
 
 // Webhook Google Apps Script
 const GOOGLE_SHEETS_WEBHOOK_URL =
-  "https://script.google.com/macros/s/AKfycbwPl0dCoraOc2J8_hkPViH2MA0ogy-HdgixGfwuUBfn2IDS5Ws9e9mWMBsce88Pf-SH9Q/exec";
+  "https://script.google.com/macros/s/AKfycbzNQjI-dX7O4SZhj9X8v65U05gBqiFExWG60h90eVnenPc0OliMKqVk4f8LSFM0wt3LOg/exec";
 
 type Language = 'it' | 'en';
 type VenueType = 'bar' | 'restaurant' | 'club';
