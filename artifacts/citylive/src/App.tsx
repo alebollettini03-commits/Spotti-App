@@ -48,7 +48,7 @@ import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter
 import { firestore, auth, googleProvider } from './lib/firebase';
 import L from 'leaflet';
 
-// Webhook Google Apps Script aggiornato con il tuo link
+// Webhook Google Apps Script
 const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxO28dxMCv-GxqxvXSTTqfEbcyIf32ULyNpR7eHXCSKUv3PJQ42nhwVBZs3PVmAk8WvOQ/exec";
 
 type Language = 'it' | 'en';
@@ -428,7 +428,19 @@ function BookingModal({ venue, event, lang, onClose, onBooked }: { venue: Venue;
    <div className="form-grid">
     <div className="field"><label htmlFor="booking-first-name">{t.firstName}</label><input id="booking-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></div>
     <div className="field"><label htmlFor="booking-last-name">{t.lastName}</label><input id="booking-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></div>
-    <div className="field"><label htmlFor="booking-date">{t.date}</label><input id="booking-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
+    <div className="field">
+     <label htmlFor="booking-date">{t.date}</label>
+     <input 
+      id="booking-date" 
+      type="date" 
+      value={date} 
+      onChange={(e) => setDate(e.target.value)} 
+      required 
+      disabled={!!event}
+      readOnly={!!event}
+      style={event ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' } : undefined}
+     />
+    </div>
     <div className="field"><label htmlFor="booking-time">{venue.type === 'restaurant' ? t.arrivalTime : t.time}</label><input id="booking-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div>
     <div className="field full"><label htmlFor="booking-guests">{t.partySize}</label>
      <select id="booking-guests" value={guests} onChange={(e) => setGuests(e.target.value)}>
