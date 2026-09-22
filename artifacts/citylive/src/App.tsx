@@ -52,7 +52,7 @@ import L from 'leaflet';
 
 // Webhook Google Apps Script
 const GOOGLE_SHEETS_WEBHOOK_URL =
-  "https://script.google.com/macros/s/AKfycbwPI0dCoraOc2J8_hkPViH2MA0ogy-HdgixGfwuUBfn2lDS5Ws9e9mWMBsce88Pf-SH9Q/exec";
+  "https://script.google.com/macros/s/AKfycbwPl0dCoraOc2J8_hkPViH2MA0ogy-HdgixGfwuUBfn2IDS5Ws9e9mWMBsce88Pf-SH9Q/exec";
 
 type Language = 'it' | 'en';
 type VenueType = 'bar' | 'restaurant' | 'club';
@@ -156,7 +156,7 @@ const translations = {
     invalidTime: "Orario non valido. L'evento inizia alle",
     invalidTimeSub: 'e non sono accettate prenotazioni precedenti.',
     confirmDeleteTitle: 'Annullare la prenotazione?',
-    confirmDeleteText: 'Sei sicuro di voler cancellare questa prenotazione? L\'azione non è reversibile.',
+    confirmDeleteText: "Sei sicuro di voler cancellare questa prenotazione? L'azione non è reversibile.",
     confirmDeleteBtn: 'Sì, cancella',
     cancel: 'Annulla',
   },
@@ -247,8 +247,11 @@ function readVenue(snapshot: { id: string; data: () => Record<string, unknown> }
   const hours = typeof data.hours === 'string' ? data.hours : '';
   const type = data.type;
   const lat = Number(data.lat);
-  const lng = Number(data.lng);
-  if (!name || !address || !hours || !isVenueType(type) || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const lng = Number(data.lng ?? data.Ing);
+
+  if (!name || !address || !hours || !isVenueType(type) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
   return { id: snapshot.id, name, address, hours, lat, lng, type };
 }
 
@@ -260,6 +263,7 @@ function readEvent(snapshot: { id: string; data: () => Record<string, unknown> }
   const time = typeof data.time === 'string' ? data.time : '';
   const type = typeof data.type === 'string' ? data.type : '';
   const posterUrl = typeof data.posterUrl === 'string' ? data.posterUrl : undefined;
+
   if (!title || !venueName || !date || !time || !type) return null;
   return { id: snapshot.id, title, venueName, date, time, type, posterUrl };
 }
@@ -332,6 +336,7 @@ function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onCh
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const t = translations[lang];
+
   const nav = [
     { href: '/', label: t.explore, icon: Compass },
     { href: '/events', label: t.events, icon: CalendarDays },
@@ -364,7 +369,8 @@ function AppShell({ children, user, eventsCount, lang, onSignIn, onSignOut, onCh
           {user ? (
             <div className="user-menu-wrap">
               <button className="user-button" onClick={() => setMenuOpen((open) => !open)}>
-                <span className="avatar">{user.name.charAt(0)}</span><span>{user.name}</span>
+                <span className="avatar">{user.name.charAt(0)}</span>
+                <span>{user.name}</span>
               </button>
               {menuOpen && (
                 <div className="user-menu" role="menu">
@@ -480,7 +486,6 @@ function BookingModal({ venue, event, lang, onClose, onBooked }: { venue: Venue;
         return;
       }
     }
-
     onBooked({
       id: `booking-${Date.now()}`,
       venueId: venue.id,
@@ -737,7 +742,7 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
                   <div>
                     <span className="event-tag"><Sparkles size={10} /> {event.type}</span>
                     <h3>{event.title}</h3>
-                    <p><strong>{event.venueName}</strong> · {event.time}{venue ? ` · ${venue.address}` : ''}</p>
+                    <p><strong>{event.venueName}</strong> {event.time} {venue ? `• ${venue.address}` : ''}</p>
                   </div>
                   <button className="primary-button" onClick={() => setEventDetail(event)}>{t.details}</button>
                 </article>
@@ -758,8 +763,8 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
           <h2>{t.editorialTitle}</h2>
           <p>{t.editorialCopy}</p>
           <div className="feature-stat">
-            <div><strong>{venues.length}</strong><span>{t.localiConnected}</span></div>
-            <div><strong>{events.length}</strong><span>{t.eventsAvailable}</span></div>
+            <div><strong>{venues.length}</strong><span> {t.localiConnected}</span></div>
+            <div><strong>{events.length}</strong><span> {t.eventsAvailable}</span></div>
           </div>
         </aside>
       </div>
@@ -769,7 +774,7 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
             <div>
               <span className="eyebrow">{formatEventDate(eventDetail.date, lang).weekday} {eventDetail.date}</span>
               <h2>{eventDetail.title}</h2>
-              <p>{eventDetail.venueName} · {eventDetail.time}</p>
+              <p>{eventDetail.venueName} {eventDetail.time}</p>
             </div>
             <button className="icon-button" onClick={() => setEventDetail(null)} aria-label="Close event details"><X size={17} /></button>
           </div>
@@ -795,7 +800,6 @@ function EventsPage({ events, venues, lang, onBook }: { events: CityEvent[]; ven
 
 function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { bookings: Booking[]; venues: Venue[]; lang: Language; onExplore: () => void; onDeleteBooking: (bookingId: string) => void }) {
   const t = translations[lang];
-
   return (
     <main className="page">
       <div className="page-heading">
@@ -822,7 +826,7 @@ function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { 
                     <h3>{venueName}</h3>
                     <p>
                       {booking.date} {booking.time}<br />
-                      {booking.guests} {venue?.address ? ` · ${venue.address}` : ''}
+                      {booking.guests} {venue?.address ? `• ${venue.address}` : ''}
                       {booking.eventTitle ? <><br />{booking.eventTitle}</> : null}
                       {booking.notes ? <><br /><em>Note: {booking.notes}</em></> : null}
                     </p>
@@ -860,7 +864,6 @@ function BookingsPage({ bookings, venues, lang, onExplore, onDeleteBooking }: { 
 
 function RouterContent({ user, venues, events, lang, onSignIn, onSignOut, onChangeLang, bookings, onBooking, onDeleteBooking }: { user: User | null; venues: Venue[]; events: CityEvent[]; lang: Language; onSignIn: () => void; onSignOut: () => void; onChangeLang: () => void; bookings: Booking[]; onBooking: (venue: Venue, event?: CityEvent) => void; onDeleteBooking: (bookingId: string) => void }) {
   const [, setLocation] = useLocation();
-
   return (
     <AppShell user={user} eventsCount={events.length} lang={lang} onSignIn={onSignIn} onSignOut={onSignOut} onChangeLang={onChangeLang}>
       <Switch>
@@ -891,6 +894,7 @@ export default function App() {
   const [lang, setLang] = useState<Language | null>(() => {
     return (localStorage.getItem('spotti_lang') as Language) || null;
   });
+
   const [user, setUser] = useState<User | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [events, setEvents] = useState<CityEvent[]>([]);
@@ -914,8 +918,8 @@ export default function App() {
 
   const handleSignIn = async () => {
     try {
-      await signInWithRedirect(auth, googleProvider);
       setAuthOpen(false);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       console.error("Errore durante l'autenticazione:", err);
     }
@@ -958,10 +962,11 @@ export default function App() {
             fullName: fullName,
             guests: booking.guests,
             venueName: booking.venueName,
-            bookingDate: booking.date
+            bookingDate: booking.date,
           }),
         }).catch((err) => console.error('Errore invio dati Google Sheets:', err));
       }
+
       showToast(translations[lang || 'it'].bookingConfirmed);
     } catch (err) {
       console.error('Errore durante il salvataggio su Firestore:', err);
@@ -989,7 +994,18 @@ export default function App() {
     setBookingTarget({ venue, event });
   };
 
+  // Gestione del rientro dal Login Google
   useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(authUser(result.user));
+        }
+      })
+      .catch((err) => {
+        console.error("Errore recupero redirect:", err);
+      });
+
     return onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser ? authUser(firebaseUser) : null);
     });
@@ -1042,7 +1058,7 @@ export default function App() {
                 });
                 await Promise.all(deletePromises);
               } catch (err) {
-                console.error("Errore durante l'eliminazione dell'evento scaduto o delle sue prenotazioni:", err);
+                console.error("Errore pulizia evento scaduto:", err);
               }
             } else {
               activeEvents.push(parsed);
@@ -1112,9 +1128,12 @@ export default function App() {
         onBooking={handleStartBooking}
         onDeleteBooking={(id) => setBookingToDelete(id)}
       />
-     {authOpen && (
-  <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => signInWithRedirect(auth, googleProvider)} />
-)}
+      {authOpen && (
+        <SignInModal
+          onClose={() => setAuthOpen(false)}
+          onSignIn={handleSignIn}
+        />
+      )}
       {bookingTarget && (
         <BookingModal
           venue={bookingTarget.venue}
