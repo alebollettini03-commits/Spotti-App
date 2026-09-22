@@ -13,6 +13,7 @@ import {
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -915,18 +916,27 @@ export default function App() {
     localStorage.setItem('spotti_lang', selectedLang);
   };
 
- const handleSignIn = async () => {
-    try {
-      setAuthOpen(false);
+const handleSignIn = async () => {
+  try {
+    setAuthOpen(false);
+    
+    // Controlla se l'utente si trova su un dispositivo mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Su smartphone e tablet reindirizza nella stessa scheda per evitare il blocco dei popup
+      await signInWithRedirect(auth, googleProvider);
+    } else {
+      // Su PC continua ad aprire la finestra popup
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
         setUser(authUser(result.user));
       }
-    } catch (err) {
-      console.error("Errore durante l'autenticazione:", err);
     }
-  };
-
+  } catch (err) {
+    console.error("Errore durante l'autenticazione:", err);
+  }
+};
   const handleCreateBooking = async (booking: Booking) => {
     if (!user) {
       showToast("Devi effettuare l'accesso per prenotare");
