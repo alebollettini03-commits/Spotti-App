@@ -49,7 +49,7 @@ import { firestore, auth, googleProvider } from './lib/firebase';
 import L from 'leaflet';
 
 // Webhook Google Apps Script
-const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxO28dxMCv-GxqxvXSTTqfEbcyIf32ULyNpR7eHXCSKUv3PJQ42nhwVBZs3PVmAk8WvOQ/exec";
+const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzNJtFmHbg5TfKhclTImKwQfNOAQp_sSPYr3xG1tb7eEFALETRlu4CjIGdiOg6TBqk0YA/exec";
 
 type Language = 'it' | 'en';
 type VenueType = 'bar' | 'restaurant' | 'club'; 
