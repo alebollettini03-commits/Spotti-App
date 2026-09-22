@@ -48,6 +48,9 @@ import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter
 import { firestore, auth, googleProvider } from './lib/firebase';
 import L from 'leaflet';
 
+// Webhook Google Apps Script aggiornato con il tuo link
+const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxO28dxMCv-GxqxvXSTTqfEbcyIf32ULyNpR7eHXCSKUv3PJQ42nhwVBZs3PVmAk8WvOQ/exec";
+
 type Language = 'it' | 'en';
 type VenueType = 'bar' | 'restaurant' | 'club'; 
 
@@ -596,6 +599,8 @@ export default function App() {
   try {
    setBookingTarget(null);
    
+   const fullName = `${booking.firstName || ''} ${booking.lastName || ''}`.trim() || user.name;
+
    const bookingData = {
     venueId: booking.venueId || '',
     venueName: booking.venueName || '',
@@ -612,7 +617,24 @@ export default function App() {
     createdAt: serverTimestamp(),
    };
    
+   // 1. Salva la prenotazione su Firebase
    await addDoc(collection(firestore, 'bookings'), bookingData);
+
+   // 2. Invia la prenotazione a Google Sheets via Webhook
+   if (GOOGLE_SHEETS_WEBHOOK_URL) {
+    fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+     method: 'POST',
+     mode: 'no-cors',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+      fullName: fullName,
+      guests: booking.guests,
+      venueName: booking.venueName,
+      bookingDate: booking.date
+     }),
+    }).catch((err) => console.error('Errore invio dati Google Sheets:', err));
+   }
+
    showToast(translations[lang || 'it'].bookingConfirmed);
   } catch (err) {
    console.error('Errore durante il salvataggio su Firestore:', err);
