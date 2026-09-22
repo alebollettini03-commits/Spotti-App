@@ -1112,9 +1112,9 @@ export default function App() {
         onBooking={handleStartBooking}
         onDeleteBooking={(id) => setBookingToDelete(id)}
       />
-      {authOpen && (
-        <SignInModal onClose={() => setAuthOpen(false)} onSignIn={handleSignIn} />
-      )}
+     {authOpen && (
+  <SignInModal onClose={() => setAuthOpen(false)} onSignIn={() => signInWithRedirect(auth, googleProvider)} />
+)}
       {bookingTarget && (
         <BookingModal
           venue={bookingTarget.venue}
