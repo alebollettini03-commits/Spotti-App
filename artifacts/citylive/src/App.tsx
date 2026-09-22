@@ -12,7 +12,8 @@ import {
 } from 'firebase/firestore';
 import {
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -913,7 +914,7 @@ export default function App() {
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
       setAuthOpen(false);
     } catch (err) {
       console.error("Errore durante l'autenticazione:", err);
