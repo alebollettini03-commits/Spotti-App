@@ -920,22 +920,21 @@ export default function App() {
 const handleSignIn = async () => {
   try {
     setAuthOpen(false);
-    
-    // Controlla se l'utente si trova su un dispositivo mobile
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // Su smartphone e tablet reindirizza nella stessa scheda per evitare il blocco dei popup
-      await signInWithRedirect(auth, googleProvider);
-    } else {
-      // Su PC continua ad aprire la finestra popup
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        setUser(authUser(result.user));
+    // Usa Popup su TUTTI i dispositivi (inclusi mobile)
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result.user) {
+      setUser(authUser(result.user));
+    }
+  } catch (err: any) {
+    console.error("Errore durante l'autenticazione:", err);
+    // Se il popup viene bloccato dal browser mobile, fai il fallback sul redirect
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectErr) {
+        console.error("Errore anche durante il redirect:", redirectErr);
       }
     }
-  } catch (err) {
-    console.error("Errore durante l'autenticazione:", err);
   }
 };
   const handleCreateBooking = async (booking: Booking) => {
