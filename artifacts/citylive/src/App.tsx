@@ -920,19 +920,19 @@ export default function App() {
 const handleSignIn = async () => {
   try {
     setAuthOpen(false);
-    // Usa Popup su TUTTI i dispositivi (inclusi mobile)
+    // Usa il popup per l'accesso Google sia su PC che su Mobile
     const result = await signInWithPopup(auth, googleProvider);
     if (result.user) {
       setUser(authUser(result.user));
     }
   } catch (err: any) {
     console.error("Errore durante l'autenticazione:", err);
-    // Se il popup viene bloccato dal browser mobile, fai il fallback sul redirect
+    // Fallback in caso di blocco popup
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
       try {
         await signInWithRedirect(auth, googleProvider);
       } catch (redirectErr) {
-        console.error("Errore anche durante il redirect:", redirectErr);
+        console.error("Errore durante il redirect:", redirectErr);
       }
     }
   }
