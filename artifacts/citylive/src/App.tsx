@@ -11,6 +11,7 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
@@ -997,22 +998,49 @@ const handleSignIn = async () => {
     }
   };
 
-  const handleStartBooking = (venue: Venue, event?: CityEvent) => {
+const handleStartBooking = (venue: Venue, event?: CityEvent) => {
     if (!user) {
-      setPendingBooking({ venue, event });
+      const pendingData = { venue, event };
+      setPendingBooking(pendingData);
+      // Salva nei dati locali per recuperarlo se il browser fa un full refresh (Redirect su mobile)
+      localStorage.setItem('spotti_pending_booking', JSON.stringify(pendingData));
       setAuthOpen(true);
       return;
     }
     setBookingTarget({ venue, event });
   };
 
-  // Gestione del rientro dal Login Google
- useEffect(() => {
+// 1. Gestisce il rientro dall'autenticazione tramite Redirect su Mobile
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(authUser(result.user));
+          // Ripristina l'eventuale prenotazione che l'utente stava cercando di fare
+          const savedPending = localStorage.getItem('spotti_pending_booking');
+          if (savedPending) {
+            try {
+              setBookingTarget(JSON.parse(savedPending));
+              localStorage.removeItem('spotti_pending_booking');
+            } catch (e) {
+              console.error('Errore parsing pending booking:', e);
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Errore durante il recupero del redirect:", err);
+      });
+  }, []);
+
+  // 2. Ascolta i cambiamenti di stato dell'utente
+  useEffect(() => {
     return onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser ? authUser(firebaseUser) : null);
     });
   }, []);
 
+  // 3. Gestisce le prenotazioni in sospeso se l'utente si autentica con popup su PC
   useEffect(() => {
     if (user && pendingBooking) {
       setBookingTarget(pendingBooking);
