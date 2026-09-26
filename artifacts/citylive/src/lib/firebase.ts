@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyA8KUSZtbCNObXbvptC5jv476U_-VV2zSc',
+  apiKey: 'AlzaSyA8KUSZtbCNObXbvptC5jv476U_-VV2zSc',
   authDomain: 'spotly-6ae5c.firebaseapp.com',
   projectId: 'spotly-6ae5c',
   storageBucket: 'spotly-6ae5c.firebasestorage.app',
@@ -22,19 +22,25 @@ export const firestore = getFirestore(app);
 
 // Configurazione Google Auth Provider
 googleProvider.setCustomParameters({
-  prompt: 'select_account' // Forza la selezione dell'account a ogni login
+  prompt: 'select_account',
 });
 
-// Impostazione della persistenza della sessione
+// Impostazione della persistenza della sessione (forzata subito)
 if (typeof window !== 'undefined') {
   setPersistence(auth, browserLocalPersistence).catch((error) => {
     console.error("Errore nell'impostazione della persistenza:", error);
   });
 
-  // App Check con gestione degli errori
+  // App Check attivo solo con protezione per ambiente di sviluppo/mobile
   try {
+    // Abilita la modalità debug se ti trovi in ambiente locale o di test
+    if (process.env.NODE_ENV === 'development') {
+      // @ts-ignore
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+
     initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider('6LcZp8AtAAAAALD6N0LaqF3I14DzBirx1oFVJjPR'),
+      provider: new ReCaptchaEnterpriseProvider('6LcZp8AtAAAAALD6N0LaqF3114DzBirx1oFVJjPR'),
       isTokenAutoRefreshEnabled: true,
     });
   } catch (error) {
